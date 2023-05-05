@@ -5,5 +5,5 @@
 |#
 
 (defpackage #:org.shirakumo.fraf.manifolds
-  (:use #:cl)
+  (:use #:cl #:org.shirakumo.flare.vector)
   (:export))
