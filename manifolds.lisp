@@ -4,10 +4,6 @@
  Author: Nicolas Hafner <shinmera@tymoon.eu>
 |#
 
-(defpackage #:org.shirakumo.fraf.manifolds
-  (:use #:cl)
-  (:export))
-
 (in-package #:org.shirakumo.fraf.manifolds)
 
 (defmacro do-faces ((a b c faces &optional result) &body body)
@@ -64,7 +60,7 @@
 (defun ub32 (&rest i)
   (make-array (length i) :element-type '(unsigned-byte 32) :initial-contents i))
 
-(defun 2-manifold-p (faces)
+(defun 2-manifold-p (faces &optional adjacency)
   (check-type faces (simple-array (unsigned-byte 32) (*)))
   (let ((edge-table (make-hash-table :test 'eql)))
     (flet ((edge-twofaced-p (a b)
@@ -90,6 +86,6 @@
                           (edge-twofaced-p b c)
                           (edge-twofaced-p c a))
                (return NIL)))
-           (loop with adjacency = (vertex-adjacency-list faces)
+           (loop initially (unless adjacency (setf adjacency (vertex-adjacency-list faces)))
                  for vertex from 0 below (length adjacency)
                  always (edge-loop-p adjacency vertex))))))

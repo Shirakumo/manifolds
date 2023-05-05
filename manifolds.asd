@@ -14,5 +14,8 @@
   :bug-tracker "https://github.com/shirakumo/manifolds/issues"
   :source-control (:git "https://github.com/shirakumo/manifolds.git")
   :serial T
-  :components ((:file "manifolds"))
-  :depends-on (:documentation-utils))
+  :components ((:file "package")
+               (:file "manifolds")
+               (:file "convert"))
+  :depends-on (:3d-vectors
+               :documentation-utils))
