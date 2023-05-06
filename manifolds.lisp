@@ -57,6 +57,23 @@
                  (vector-push-extend (cons a b) edges)))
       edges)))
 
+(defun face-normals (vertices faces &optional (face-normals (make-array (truncate (length faces) 3))))
+  (loop for i from 0 below (length faces) by 3
+        for j from 0
+        for a = (v vertices (aref faces (+ 0 i)))
+        for b = (v vertices (aref faces (+ 1 i)))
+        for c = (v vertices (aref faces (+ 2 i)))
+        do (setf (aref face-normals j) (vc (v- b a) (v- c a))))
+  face-normals)
+
+(defun vertex-faces (faces &optional vertex-faces)
+  (let ((vertex-faces (or vertex-faces
+                          (make-array (loop for vertex across faces maximize vertex)))))
+    (dotimes (i (length faces))
+      (pushnew (truncate i 3) (aref vertex-faces (aref faces i))))
+    (dotimes (i (length faces) vertex-faces)
+      (setf (aref vertex-faces i) (nreverse (aref vertex-faces i))))))
+
 (defun ub32 (&rest i)
   (make-array (length i) :element-type '(unsigned-byte 32) :initial-contents i))
 
