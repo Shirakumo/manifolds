@@ -515,8 +515,8 @@
                          (setf step (update-step-size v-faces vertex move-dir step))
                          (nv+* (aref vertices vertex) move-dir step))))
             (loop for index across queue
-                  do (setf (sbitp visited index) T)))))
-      (values vertices faces))))
+                  do (setf (sbitp visited index) T))))))
+    (values vertices faces)))
 
 (defun transfer-vertices (vertices faces)
   (check-type vertices (vector vec3))
@@ -529,18 +529,19 @@
                (setf (aref map (aref faces i)) 1)
                (incf count 3)))
     (let ((out-vertices (make-array count :element-type 'single-float))
+          (out-faces (make-array (length faces) :element-type '(unsigned-byte 32)))
           (out-i 0))
       (loop for vertex from 0 below (length map)
             for location = (aref vertices vertex)
             do (when (< 0 (aref map vertex))
-                 (setf (aref map vertex) (truncate (length out-vertices) 3))
+                 (setf (aref map vertex) (truncate out-i 3))
                  (setf (aref out-vertices (+ 0 out-i)) (vx location))
                  (setf (aref out-vertices (+ 1 out-i)) (vy location))
                  (setf (aref out-vertices (+ 2 out-i)) (vz location))
                  (incf out-i 3)))
-      (loop for i from 0 below (length faces)
-            do (setf (aref faces i) (aref map (aref faces i))))
-      (values out-vertices faces))))
+      (loop for i from 0 below (length out-faces)
+            do (setf (aref out-faces i) (aref map (aref faces i))))
+      (values out-vertices out-faces))))
 
 (defun normalize-vertices (vertices faces)
   (check-type vertices (simple-array single-float (*)))
@@ -566,12 +567,11 @@
                (record c a)))
     (loop for i from 0 below (length vertices) by 3
           for weight across weights
-          for displacement across displacements
           do (when (< 0 weight)
                (let ((weight (/ weight)))
-                 (setf (aref vertices (+ 0 i)) (* (vx displacement) weight))
-                 (setf (aref vertices (+ 1 i)) (* (vy displacement) weight))
-                 (setf (aref vertices (+ 2 i)) (* (vz displacement) weight))))))
+                 (setf (aref vertices (+ 0 i)) (* (aref displacements (+ 0 i)) weight))
+                 (setf (aref vertices (+ 1 i)) (* (aref displacements (+ 1 i)) weight))
+                 (setf (aref vertices (+ 2 i)) (* (aref displacements (+ 2 i)) weight))))))
   (values vertices faces))
 
 (defun manifold (vertices faces &key (resolution 1000))
