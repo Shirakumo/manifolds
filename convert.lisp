@@ -504,6 +504,7 @@
 (defun transfer-vertices (vertices faces)
   (check-type vertices (vector vec3))
   (check-type faces (vector (unsigned-byte 32)))
+  ;; Compacts the vertices and faces down again into a packed array.
   (let ((map (make-array (length vertices) :element-type '(unsigned-byte 32) :initial-element 0))
         (count 0))
     (loop for i from 0 below (length faces)
@@ -527,6 +528,7 @@
 (defun normalize-vertices (vertices faces)
   (check-type vertices (simple-array single-float (*)))
   (check-type faces (simple-array (unsigned-byte 32) (*)))
+  ;; Some kinda smoothing operation? I'm not entirely sure to be honest.
   (let ((displacements (make-array (length vertices) :element-type 'single-float))
         (weights (make-array (truncate (length vertices) 3) :element-type '(unsigned-byte 32))))
     (labels ((transfer (a b)
@@ -564,4 +566,4 @@
         (multiple-value-call #'project-manifold
           (multiple-value-call #'construct-triangle-mesh
             (construct-quad-manifold tree) tree)
-          (values vertices faces))))))
+          vertices faces)))))
