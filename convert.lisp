@@ -14,8 +14,8 @@
   (number 1 :type (unsigned-byte 32)) ; Number of occupied nodes in this branch
   (faces NIL :type (simple-array (unsigned-byte 32) (*)))
   (children NIL :type (or null (simple-array node (8))))
-  (neighbors (make-array 6) :type (simple-vector 6))
-  (empty-neighbors (make-array 6) :type (simple-vector 6)))
+  (neighbors (make-array 6 :initial-element NIL) :type (simple-vector 6))
+  (empty-neighbors (make-array 6 :initial-element NIL) :type (simple-vector 6)))
 
 (defmethod print-object ((node node) stream)
   (print-unreadable-object (node stream :type T)
@@ -59,9 +59,9 @@
           ((= 0 (node-level node))
            NIL)
           (T
-           (let ((i (+ (* 1 (< (vz point) (vz location)))
-                       (* 2 (< (vy point) (vy location)))
-                       (* 4 (< (vx point) (vx location))))))
+           (let ((i (+ (if (< (vz point) (vz location)) 1 0)
+                       (if (< (vy point) (vy location)) 2 0)
+                       (if (< (vx point) (vx location)) 4 0))))
              (exterior-p (aref (node-children node) i) point))))))
 
 (defun build-octtree (vertices faces &key (resolution 1000))
@@ -103,7 +103,7 @@
 
 (defun build-neighborhood (node)
   (when (< 0 (node-level node))
-    (mapc #'build-neighborhood (node-children node))
+    (map NIL #'build-neighborhood (node-children node))
     (labels ((recur-full (l r li ri order)
                (setf (aref (node-neighbors l) ri) r)
                (setf (aref (node-neighbors r) li) l)
@@ -115,20 +115,23 @@
              (recur-empty (l r li ri order)
                (cond ((and (node-occupied-p l) (node-occupied-p r))
                       (unless (= 0 (node-level l))
-                        (loop for (j . i) across order
-                              do (recur-empty (aref (node-children l) i)
-                                              (aref (node-children r) j)
-                                              li ri order))))
+                        (when (and (node-children l) (node-children r))
+                          (loop for (j . i) across order
+                                do (recur-empty (aref (node-children l) i)
+                                                (aref (node-children r) j)
+                                                li ri order)))))
                      ((not (node-occupied-p l))
                       (setf (aref (node-empty-neighbors r) ri) l)
-                      (loop for (j . i) across order
-                            do (recur-empty l (aref (node-children r) j)
-                                            li ri order)))
+                      (when (node-children r)
+                        (loop for (j . i) across order
+                              do (recur-empty l (aref (node-children r) j)
+                                              li ri order))))
                      ((not (node-occupied-p r))
                       (setf (aref (node-empty-neighbors l) li) r)
-                      (loop for (j . i) across order
-                            do (recur-empty (aref (node-children l) i) r
-                                            li ri order)))))
+                      (when (node-children l)
+                        (loop for (j . i) across order
+                              do (recur-empty (aref (node-children l) i) r
+                                              li ri order))))))
              (recur (l r li ri order)
                (recur-full l r li ri order)
                (recur-empty l r li ri order)))
@@ -141,7 +144,8 @@
               for (zi . zj) across zo
               do (recur (aref (node-children node) xi) (aref (node-children node) xj) 0 3 xo)
                  (recur (aref (node-children node) yi) (aref (node-children node) yj) 1 4 yo)
-                 (recur (aref (node-children node) zi) (aref (node-children node) zj) 2 5 zo))))))
+                 (recur (aref (node-children node) zi) (aref (node-children node) zj) 2 5 zo)))))
+  node)
 
 (defun construct-quad-manifold (tree)
   (let ((vcolor (make-hash-table :test 'equalp))
@@ -233,7 +237,7 @@
               for c = (aref quad-faces (+ face-i 0))
               for d = (aref quad-faces (+ face-i 0))
               for tt = 0
-              do (loop while (and (< tt 4) (gethash marked-v (aref quad-faces (+ face-i tt))))
+              do (loop while (and (< tt 4) (gethash (aref quad-faces (+ face-i tt)) marked-v))
                        do (incf tt)
                           (rotatef a b c d))
                  (cond ((= 4 tt) ; If the entire quad face is in the proper configuration, just emit it.
@@ -403,6 +407,18 @@
                                          normal))
                             (return-from convex-p NIL)))
                      finally (return T)))
+             (closest-on-orig (vertex)
+               (let ((cpoint NIL)
+                     (normal (vec 0 0 0))
+                     (v (aref vertices vertex)))
+                 (loop for face across (aref vertex-faces vertex)
+                       do (let ((p (closest-point-on-triangle orig-vertices orig-faces face v)))
+                            (when (or (null cpoint) (< (vdistance p v) (vdistance cpoint v)))
+                              (setf normal (face-normal orig-vertices orig-faces face))
+                              (setf cpoint p)
+                              (when (< (v. normal (v- v cpoint)) 0)
+                                (nv- normal)))))
+                 (nv+* cpoint normal 5e-4)))
              (mark-invalid (vertex)
                (setf (aref invalid-indices vertex) (length invalid-vertices))
                (vector-push-extend vertex invalid-vertices))
@@ -413,15 +429,16 @@
                      for c = (aref faces (+ 2 (* 3 face)))
                      do (loop until (= a vertex)
                               do (rotatef a b c))
-                        (let* ((dir (nvunit (v- (aref vertices c) (aref vertices b))))
+                        (let* ((dir (nvunit* (v- (aref vertices c) (aref vertices b))))
                                (h (v+ (aref vertices b)
                                       (v* (v. (v- (aref vertices a) (aref vertices b)) dir) dir)
                                       (v- (aref vertices a))))
                                (h-len (vlength h)))
-                          (nv/ h h-len)
-                          (let ((h-step (* (v. h move-dir) step)))
-                            (when (< (* 0.7 h-len) h-step)
-                              (setf step (* step h-len 0.7 (/ h-step)))))))
+                          (when (/= 0 h-len)
+                            (nv/ h h-len)
+                            (let ((h-step (* (v. h move-dir) step)))
+                              (when (< (* 0.7 h-len) h-step)
+                                (setf step (* step h-len 0.7 (/ h-step))))))))
                step))
       ;; Main projection loop
       (dotimes (iter iterations)
@@ -429,14 +446,14 @@
         (dotimes (vertex vertex-count)
           (when (= 0 (sbit visited vertex))
             (let* ((v-faces (aref vertex-faces vertex))
-                   (closest (find-closest-point-on-mesh orig-vertices orig-faces orig-vertex-faces vertex))
+                   (closest (closest-on-orig vertex))
                    (move-dir (v- closest (aref vertices vertex)))
                    (orig-step (vlength move-dir))
                    (step orig-step)
                    (flag (< step 1e15))
-                   (normal (nvunit (reduce #'nv+ v-faces
-                                           :initial-value (vec 0 0 0)
-                                           :key (lambda (f) (aref face-normals f))))))
+                   (normal (nvunit* (reduce #'nv+ v-faces
+                                            :initial-value (vec 0 0 0)
+                                            :key (lambda (f) (aref face-normals f))))))
               (nv/ move-dir orig-step)
               (when flag
                 (if (convex-p vertex normal)
@@ -557,7 +574,7 @@
                  (setf (aref vertices (+ 2 i)) (* (vz displacement) weight))))))
   (values vertices faces))
 
-(defun manifold (vertices faces &key resolution)
+(defun manifold (vertices faces &key (resolution 1000))
   (check-type vertices (simple-array single-float (*)))
   (check-type faces (simple-array (unsigned-byte 32) (*)))
   (let ((tree (build-octtree vertices faces :resolution resolution)))

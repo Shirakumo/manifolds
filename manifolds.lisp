@@ -6,6 +6,12 @@
 
 (in-package #:org.shirakumo.fraf.manifolds)
 
+(defun u32 (&rest i)
+  (make-array (length i) :element-type '(unsigned-byte 32) :initial-contents i))
+
+(defun f32 (&rest i)
+  (make-array (length i) :element-type 'single-float :initial-contents (mapcar #'float i)))
+
 (defmacro do-faces ((a b c faces &optional result) &body body)
   (let ((i (gensym "I"))
         (f (gensym "F")))
@@ -158,19 +164,6 @@
              (max 0.0 (min 1.0 x))))
       (nv+* (nv+* (v vertices (aref faces (* face 3))) e0 (clamp u)) e1 (clamp v)))))
 
-(defun find-closest-point-on-mesh (vertices faces vertex-faces vertex)
-  (let ((cpoint (vec 1e20 1e20 1e20))
-        (normal (vec 0 0 0))
-        (v (aref vertices vertex)))
-    (loop for face across (aref vertex-faces vertex)
-          do (let ((p (closest-point-on-triangle vertices faces face v)))
-               (when (< (vdistance p v) (vdistance cpoint v))
-                 (setf normal (face-normal* vertices faces face))
-                 (when (< (v. normal (v- v cpoint)) 0)
-                   (nv- normal))
-                 (v<- cpoint p))))
-    (nv+* cpoint normal 5e-4)))
-
 (defun face-in-volume-p (vertices faces face c e)
   (declare (type (unsigned-byte 32) face))
   (declare (type vec3 c e))
@@ -212,7 +205,8 @@
           do (when (face-in-volume-p vertices faces face location bsize)
                (vector-push-extend (aref faces (+ 0 j)) new-faces)
                (vector-push-extend (aref faces (+ 1 j)) new-faces)
-               (vector-push-extend (aref faces (+ 2 j)) new-faces)))))
+               (vector-push-extend (aref faces (+ 2 j)) new-faces)))
+    (make-array (length new-faces) :element-type '(unsigned-byte 32) :initial-contents new-faces)))
 
 (defun bounding-box (vertices)
   (let ((min (vec (aref vertices 0) (aref vertices 1) (aref vertices 2)))
@@ -232,14 +226,11 @@
 
 (defun vertex-faces (faces &optional vertex-faces)
   (let ((vertex-faces (or vertex-faces
-                          (make-array (loop for vertex across faces maximize vertex)))))
-    (dotimes (i (length faces))
-      (pushnew (truncate i 3) (aref vertex-faces (aref faces i))))
+                          (make-array (1+ (loop for vertex across faces maximize vertex))))))
+    (dotimes (i (length vertex-faces))
+      (setf (aref vertex-faces i) (make-array 0 :adjustable T :fill-pointer T)))
     (dotimes (i (length faces) vertex-faces)
-      (setf (aref vertex-faces i) (nreverse (aref vertex-faces i))))))
-
-(defun ub32 (&rest i)
-  (make-array (length i) :element-type '(unsigned-byte 32) :initial-contents i))
+      (vector-push-extend (truncate i 3) (aref vertex-faces (aref faces i))))))
 
 (defun 2-manifold-p (faces &optional adjacency)
   (check-type faces (simple-array (unsigned-byte 32) (*)))
