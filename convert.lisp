@@ -222,14 +222,14 @@
                (vector-push-extend b faces)
                (vector-push-extend c faces)))
       ;; First loop to construct vertices.
-      (flet ((maybe-emit-vertex (point a b &optional (faces a))
+      (flet ((maybe-emit-vertex (point a b &optional (vertex a))
                (let ((index (gethash point vcolor)))
                  (unless index
                    (setf index (length vertices))
                    (setf (gethash point vcolor) index)
                    (vector-push-extend point v-info)
                    (vector-push-extend (nv* (v+ (aref vertices a) (aref vertices b)) 0.5) vertices)
-                   (vector-push-extend (aref vertex-faces faces) vertex-faces))
+                   (vector-push-extend (aref vertex-faces vertex) vertex-faces))
                  index)))
         (loop for face-i from 0 below (length quad-faces) by 4
               for a = (aref quad-faces (+ face-i 0))
@@ -381,26 +381,23 @@
                        (setf dir (vc vert dir)))
                      (nvunit dir)
                      (frob vertex dir len)))))
-      (values vertices faces))))
+      (values vertices faces vertex-faces))))
 
-(defun project-manifold (vertices faces orig-vertices orig-faces &key (iterations 20)
-                                                                      (vertex-faces (vertex-faces faces))
-                                                                      (orig-vertex-faces (vertex-faces orig-faces)))
+(defun project-manifold (vertices faces vertex-faces orig-vertices orig-faces &key (iterations 20))
   (check-type vertices (vector vec3))
   (check-type faces (vector (unsigned-byte 32)))
   (check-type orig-vertices (simple-array single-float (*)))
   (check-type orig-faces (simple-array (unsigned-byte 32) (*)))
-  (check-type orig-vertex-faces (vector list))
   (let* ((vertex-count (length vertices))
          (len (min (vdistance (aref vertices (aref faces 0)) (aref vertices (aref faces 1)))
                    (vdistance (aref vertices (aref faces 0)) (aref vertices (aref faces 2)))))
          (face-normals (make-array (truncate (length faces) 3)))
          (invalid-vertices (make-array 0 :element-type '(unsigned-byte 32) :adjustable T :fill-pointer T))
          (invalid-indices (make-array (length vertex-faces) :element-type '(signed-byte 32) :initial-element -1))
-         (visited (make-array (length vertex-faces) :element-type 'bit))
+         (visited (make-array vertex-count :element-type 'bit))
          (min-step (/ 2.0 iterations)))
     (labels ((convex-p (vertex normal)
-               (loop for face across (aref vertex-faces vertex)
+               (loop for face in (aref vertex-faces vertex)
                      do (dotimes (i 3)
                           (when (< 0 (v. (v- (aref vertices (aref faces (+ i (* 3 face))))
                                              (aref vertices vertex))
@@ -411,19 +408,26 @@
                (let ((cpoint NIL)
                      (normal (vec 0 0 0))
                      (v (aref vertices vertex)))
-                 (loop for face across (aref vertex-faces vertex)
-                       do (let ((p (closest-point-on-triangle orig-vertices orig-faces face v)))
-                            (when (or (null cpoint) (< (vdistance p v) (vdistance cpoint v)))
-                              (setf normal (face-normal orig-vertices orig-faces face))
-                              (setf cpoint p)
-                              (when (< (v. normal (v- v cpoint)) 0)
-                                (nv- normal)))))
-                 (nv+* cpoint normal 5e-4)))
+                 (loop for face in (aref vertex-faces vertex)
+                       ;; I do *not* understand how this worked in the original code. The vertex-faces array
+                       ;; can, at this point, include face indices that were not part of the orig-faces array
+                       ;; and can, thus, point outside its range. The construct-triangle-mesh function emits
+                       ;; new vertices and faces and also updates the vertex-faces array as part of that.
+                       do (when (< (* 3 face) (length orig-faces))
+                            (let ((p (closest-point-on-triangle orig-vertices orig-faces face v)))
+                              (when (or (null cpoint) (< (vdistance p v) (vdistance cpoint v)))
+                                (setf normal (face-normal orig-vertices orig-faces face))
+                                (setf cpoint p)
+                                (when (< (v. normal (v- v cpoint)) 0)
+                                  (nv- normal))))))
+                 (if cpoint
+                     (nv+* cpoint normal 5e-4)
+                     v)))
              (mark-invalid (vertex)
                (setf (aref invalid-indices vertex) (length invalid-vertices))
                (vector-push-extend vertex invalid-vertices))
              (update-step-size (vertex v-faces move-dir step)
-               (loop for face across v-faces
+               (loop for face in v-faces
                      for a = (aref faces (+ 0 (* 3 face)))
                      for b = (aref faces (+ 1 (* 3 face)))
                      for c = (aref faces (+ 2 (* 3 face)))
@@ -454,13 +458,14 @@
                    (normal (nvunit* (reduce #'nv+ v-faces
                                             :initial-value (vec 0 0 0)
                                             :key (lambda (f) (aref face-normals f))))))
-              (nv/ move-dir orig-step)
+              (when (< 0 orig-step)
+                (nv/ move-dir orig-step))
               (when flag
                 (if (convex-p vertex normal)
-                    (loop for face across v-faces
+                    (loop for face in v-faces
                           do (when (< 0 (v. (aref face-normals face) move-dir))
                                (return (setf flag NIL))))
-                    (loop for face across v-faces
+                    (loop for face in v-faces
                           do (when (< (v. (aref face-normals face) move-dir) 0)
                                (return (setf flag T))))))
               (cond (flag
@@ -476,7 +481,7 @@
                             (setf (sbit visited vertex) 1))
                            (T
                             (nv+* (aref vertices vertex) move-dir step)))
-                     (loop for face across v-faces
+                     (loop for face in v-faces
                            do (setf (aref face-normals face) (face-normal* vertices faces face))))
                     (T
                      (mark-invalid vertex)))))))
