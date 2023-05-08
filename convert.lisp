@@ -218,9 +218,10 @@
                (setf (gethash x marked-v) T)
                (setf (gethash y marked-v) T)))
     (flet ((emit-face (a b c)
-               (vector-push-extend a faces)
-               (vector-push-extend b faces)
-               (vector-push-extend c faces)))
+             (assert (not (= a b c)))
+             (vector-push-extend a faces)
+             (vector-push-extend b faces)
+             (vector-push-extend c faces)))
       ;; First loop to construct vertices.
       (flet ((maybe-emit-vertex (point a b &optional (vertex a))
                (let ((index (gethash point vcolor)))
