@@ -4,19 +4,16 @@
  Author: Nicolas Hafner <shinmera@tymoon.eu>
 |#
 
-(asdf:defsystem manifolds
+(asdf:defsystem manifolds-test
   :version "1.0.0"
   :license "zlib"
   :author "Nicolas Hafner <shinmera@tymoon.eu>"
   :maintainer "Nicolas Hafner <shinmera@tymoon.eu>"
-  :description "Various manifold mesh algorithms"
+  :description "Tests for the manifolds system."
   :homepage "https://shirakumo.github.io/manifolds/"
   :bug-tracker "https://github.com/shirakumo/manifolds/issues"
   :source-control (:git "https://github.com/shirakumo/manifolds.git")
   :serial T
-  :components ((:file "package")
-               (:file "manifolds")
-               (:file "convert"))
-  :depends-on (:3d-vectors
-               :documentation-utils)
-  :in-order-to ((asdf:test-op (asdf:test-op :manifolds-test))))
+  :components ((:file "test"))
+  :depends-on (:manifolds :parachute)
+  :perform (asdf:test-op (op c) (uiop:symbol-call :parachute :test :manifolds-test)))

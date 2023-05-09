@@ -585,13 +585,13 @@
                  (setf (aref vertices (+ 2 i)) (* (aref displacements (+ 2 i)) weight))))))
   (values vertices faces))
 
-(defun manifold (vertices faces &key (resolution 10))
+(defun manifold (vertices faces &key (resolution 10) project)
   (check-type vertices (simple-array single-float (*)))
   (check-type faces (simple-array (unsigned-byte 32) (*)))
   (let ((tree (build-octtree vertices faces :resolution resolution)))
     (multiple-value-call #'normalize-vertices
       (multiple-value-call #'transfer-vertices
-        (multiple-value-call #'project-manifold
+        (multiple-value-call (if project #'project-manifold #'values)
           (multiple-value-call #'construct-triangle-mesh
             (construct-quad-manifold tree) tree)
           vertices faces)))))
