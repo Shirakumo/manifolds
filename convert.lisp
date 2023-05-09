@@ -6,6 +6,9 @@
 
 (in-package #:org.shirakumo.fraf.manifolds)
 
+(defun dbg (&rest stuff)
+  (format *debug-io* "~&> ~{~a~^ ~}~%" stuff))
+
 (defstruct (node
             (:constructor %node (location bsize faces &key number level)))
   (location NIL :type vec3)
@@ -234,17 +237,19 @@
                  index)))
         (loop for face-i from 0 below (length quad-faces) by 4
               for a = (aref quad-faces (+ face-i 0))
-              for b = (aref quad-faces (+ face-i 0))
-              for c = (aref quad-faces (+ face-i 0))
-              for d = (aref quad-faces (+ face-i 0))
+              for b = (aref quad-faces (+ face-i 1))
+              for c = (aref quad-faces (+ face-i 2))
+              for d = (aref quad-faces (+ face-i 3))
               for tt = 0
               do (loop while (and (< tt 4) (gethash (aref quad-faces (+ face-i tt)) marked-v))
                        do (incf tt)
                           (rotatef a b c d))
                  (cond ((= 4 tt) ; If the entire quad face is in the proper configuration, just emit it.
+                        (dbg face-i "|" "-" "-" "-" "-")
                         (emit-face a c b)
                         (emit-face a d c))
-                       (T ; Otherwise possibly split the face
+                       (T          ; Otherwise possibly split the face
+                        (dbg face-i "|" a b c d)
                         (let* ((flag1 (gethash a marked-v))
                                (flag2 (gethash b marked-v))
                                (flag3 (gethash c marked-v))
@@ -580,7 +585,7 @@
                  (setf (aref vertices (+ 2 i)) (* (aref displacements (+ 2 i)) weight))))))
   (values vertices faces))
 
-(defun manifold (vertices faces &key (resolution 1000))
+(defun manifold (vertices faces &key (resolution 10))
   (check-type vertices (simple-array single-float (*)))
   (check-type faces (simple-array (unsigned-byte 32) (*)))
   (let ((tree (build-octtree vertices faces :resolution resolution)))
