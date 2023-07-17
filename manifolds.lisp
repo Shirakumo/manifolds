@@ -108,6 +108,32 @@
   (dotimes (i (length face-normals) face-normals)
     (setf (aref face-normals i) (face-normal* vertices faces i))))
 
+(defun face-area (vertices faces face)
+  (let* ((i (* 3 face))
+         (p1 (v vertices (aref faces (+ 0 i))))
+         (p2 (v vertices (aref faces (+ 1 i))))
+         (p3 (v vertices (aref faces (+ 2 i)))))
+    (let* ((base (v2norm (v- p2 p1)))
+           (height (if (= 0.0 base) 0.0
+                       (v2norm (v- p3 p1 (v* (v- p2 p1) (/ (v. (v- p3 p1) (v- p2 p1))
+                                                           (* base base))))))))
+      (* 0.5 base height))))
+
+(defun centroid (vertices faces)
+  (let ((numerator (vec 0 0 0))
+        (denominator 0.0))
+    (loop for i from 0 below (length faces) by 3
+          for i1 = (aref faces (+ 0 i))
+          for i2 = (aref faces (+ 1 i))
+          for i3 = (aref faces (+ 2 i))
+          for sum = (v/ (v+ (v vertices i1) (v vertices i2) (v vertices i3)) 3)
+          for area = (face-area vertices faces (truncate i 3))
+          do (nv+ numerator (v* sum area))
+             (incf denominator area))
+    (if (= denominator 0.0)
+        numerator
+        (nv* numerator (/ denominator)))))
+
 (defun closest-point-on-triangle (vertices faces face point)
   (let* ((v0 (v vertices (aref faces (+ 0 (* face 3)))))
          (e0 (nv- (v vertices (aref faces (+ 1 (* face 3)))) v0))
