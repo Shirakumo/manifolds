@@ -163,11 +163,15 @@
         (T
          (< (vz3 a) (vz3 b)))))
 
-(defun vmincoeff (a)
-  (min (vx3 a) (vy3 a) (vz3 a)))
-
 (defun vmaxcoeff (a)
-  (max (vx3 a) (vy3 a) (vz3 a)))
+  (let ((x (vx3 a)) (y (vy3 a)) (z (vz3 a)))
+    (if (< x y)
+        (if (< y z) 
+            (values z :z)
+            (values y :y))
+        (if (< x z)
+            (values z :z)
+            (values x :x)))))
 
 (defun determinant3x3 (a b c)
   (let ((a01xa12 (* (vy3 a) (vz3 b)))
@@ -199,6 +203,47 @@
              (decf power)
           while (/= 0 v))
     x))
+
+(defun aabb-ray (aabb start dir)
+  (let ((inside-p T)
+        (ta (vec3 -1 -1 -1)))
+    (macrolet ((test (dim)
+                 `(cond ((< (,dim start) (,dim (aabb-min aabb)))
+                         (when (/= 0 (,dim dir))
+                           (setf (,dim ta) (/ (- (,dim (aabb-min aabb)) (,dim start)) (,dim dir))))
+                         (setf inside-p NIL))
+                        ((< (,dim (aabb-max aabb)) (,dim start))
+                         (when (/= 0 (,dim dir))
+                           (setf (,dim ta) (/ (- (,dim (aabb-max aabb)) (,dim start)) (,dim dir))))
+                         (setf inside-p NIL)))))
+      (test vx3) (test vy3) (test vz3))
+    (if inside-p
+        0.0
+        (multiple-value-bind (tmax taxis) (vmaxcoeff ta)
+          (when (and (<= 0 tmax)
+                     (or (eq :x taxis) (and (< (vx (aabb-min aabb)) (vx hit)) (< (vx hit) (vx (aabb-max aabb)))))
+                     (or (eq :y taxis) (and (< (vy (aabb-min aabb)) (vy hit)) (< (vy hit) (vy (aabb-max aabb)))))
+                     (or (eq :z taxis) (and (< (vz (aabb-min aabb)) (vz hit)) (< (vz hit) (vz (aabb-max aabb))))))
+            tmax)))))
+
+(defun ray-triangle (p dir a b c)
+  (let* ((ab (v- b a))
+         (ac (v- c a))
+         (n (vc ab ac))
+         (d (- (v. dir n)))
+         (ood (/ d))
+         (tt (* ood (v. ap n))))
+    (when (<= 0 tt)
+      (let ((e (v- (vc dir ap)))
+            (v (* (v. ac e) ood)))
+        (when (<= 0.0 v 1.0)
+          (let ((w (- (* (v. ab e) ood))))
+            (when (and (<= 0.0 w) (<= (+ v w) 1.0))
+              (let ((u (- 1 v w)))
+                (values t u v w d n)))))))))
+
+(defun closest-point-on-triangle* (a b c p)
+  ())
 
 ;;; Actual algorithm
 
