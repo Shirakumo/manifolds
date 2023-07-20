@@ -10,7 +10,8 @@
   :serial T
   :components ((:file "package")
                (:file "manifolds")
-               (:file "convert"))
+               (:file "convert")
+               (:file "decomposition"))
   :depends-on (:3d-vectors
                :3d-spaces
                :quickhull
