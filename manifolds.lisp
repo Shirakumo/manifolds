@@ -134,20 +134,6 @@
         numerator
         (nv* numerator (/ denominator)))))
 
-(defun determinant3x3 (a b c)
-  (let ((a01xa12 (* (vy3 a) (vz3 b)))
-        (a02xa11 (* (vz3 a) (vy3 b)))
-        (a00xa12 (* (vx3 a) (vz3 b)))
-        (a02xa10 (* (vz3 a) (vx3 b)))
-        (a00xa11 (* (vx3 a) (vy3 b)))
-        (a01xa10 (* (vy3 a) (vx3 b))))
-    (values (+ (* (- a01xa12 a02xa11) (vx3 c))
-               (- (* (- a00xa12 a02xa10) (vy3 c)))
-               (* (- a00xa11 a01xa10) (vz3 c)))
-            (+ (+ (abs a01xa12) (* (abs a02xa11) (abs (vX3 c))))
-               (+ (abs a00xa12) (* (abs a02xa10) (abs (vY3 c))))
-               (+ (abs a00xa11) (* (abs a01xa10) (abs (vZ3 c))))))))
-
 (defun convex-volume (vertices faces)
   (let ((bary (vec3)))
     (loop for i from 0 below (length vertices) by 3
