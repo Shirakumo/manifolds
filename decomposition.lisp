@@ -122,7 +122,7 @@
   (id 0 :type (unsigned-byte 32))
   (points (make-array 0 :adjustable T :fill-pointer T) :type vector)
   (triangles (make-array 0 :adjustable T :fill-pointer T) :type vector)
-  (volume 0d0 :type single-float)
+  (volume 0.0 :type single-float)
   (center (vec 0 0 0) :type vec3)
   ;; Private
   (list () :type list)
@@ -164,7 +164,7 @@
             (:constructor %hull-face ())
             (:copier NIL)
             (:predicate NIL))
-  (index (make-array 3) :type (simple-array (unsigned-byte 32) (3)))
+  (index (make-array 3 :element-type '(unsigned-byte 32)) :type (simple-array (unsigned-byte 32) (3)))
   (twin (make-array 3) :type (simple-array T (3)))
   (mark NIL :type boolean))
 
@@ -288,13 +288,13 @@
   (index 0 :type (unsigned-byte 32))
   (volume-error 0.0 :type single-float)
   (voxel-volume 0.0 :type single-float)
-  (hull-volume 0.0 :type single-float)
+  (volume 0.0 :type single-float)
   (convex-hull NIL :type (or null convex-hull))
   (surface-voxels (make-array 0 :element-type 'voxel :adjustable T :fill-pointer T) :type (vector voxel))
   (new-surface-voxels (make-array 0 :element-type 'voxel :adjustable T :fill-pointer T) :type (vector voxel))
   (interior-voxels (make-array 0 :element-type 'voxel :adjustable T :fill-pointer T) :type (vector voxel))
-  (hull-a NIL :type (or null voxel-hull))
-  (hull-b NIL :type (or null voxel-hull))
+  (a NIL :type (or null voxel-hull))
+  (b NIL :type (or null voxel-hull))
   (m1 (make-array 3 :element-type '(unsigned-byte 32)) :type (simple-array (unsigned-byte 32) (3)))
   (m2 (make-array 3 :element-type '(unsigned-byte 32)) :type (simple-array (unsigned-byte 32) (3)))
   (aabb-tree NIL :type (or null aabb-tree))
@@ -305,10 +305,9 @@
   (parameters NIL :type ch-parameters))
 
 (defstruct (cost-task
-            (:constructor make-cost-task)
+            (:constructor make-cost-task (a b))
             (:copier NIL)
             (:predicate NIL))
-  (decomposer NIL :type decomposer)
   (a NIL :type (or null convex-hull))
   (b NIL :type (or null convex-hull))
   (concavity 0.0 :type single-float))
@@ -323,10 +322,6 @@
             (:constructor %make-decomposer (vertices indices parameters))
             (:copier NIL)
             (:predicate NIL))
-  (convex-hulls (make-array 0 :adjustable T :fill-pointer T) :type vector)
-  (voxel-hulls (make-array 0 :adjustable T :fill-pointer T) :type vector)
-  (pending-hulls (make-array 0 :adjustable T :fill-pointer T) :type vector)
-  (trees (make-array 0 :adjustable T :fill-pointer T) :type vector)
   (aabb-tree NIL :type (or null aabb-tree))
   (voxelize NIL :type (or null volume))
   (center (vec3) :type vec3)
@@ -336,12 +331,8 @@
   (indices NIL :type (simple-array (unsigned-byte 32) (*)))
   (overall-hull-volume 0.0 :type single-float)
   (voxel-scale 0.0 :type single-float)
-  (voxel-half-scale 0.0 :type single-float)
-  (voxel-bmin (vec3) :type vec3)
-  (voxel-bmax (vec3) :type vec3)
   (parameters NIL :type ch-parameters)
-  (hull-pair-queue (priority-queue:make-pqueue #'<= :key-type 'single-float) :type priority-queue::pqueue)
-  (hulls () :type list))
+  (hull-pair-queue (priority-queue:make-pqueue #'<= :key-type 'single-float) :type priority-queue::pqueue))
 
 ;;;; Additional ops
 ;;; They implement strange comparators.
@@ -400,21 +391,22 @@
         0.0
         (multiple-value-bind (tmax taxis) (vmaxcoeff ta)
           (when (and (<= 0 tmax)
-                     (or (eq :x taxis) (and (< (vx (aabb-min aabb)) (vx hit)) (< (vx hit) (vx (aabb-max aabb)))))
-                     (or (eq :y taxis) (and (< (vy (aabb-min aabb)) (vy hit)) (< (vy hit) (vy (aabb-max aabb)))))
-                     (or (eq :z taxis) (and (< (vz (aabb-min aabb)) (vz hit)) (< (vz hit) (vz (aabb-max aabb))))))
+                     (or (eq :x taxis) (and (< (vx (aabb-min aabb)) (vx ta)) (< (vx ta) (vx (aabb-max aabb)))))
+                     (or (eq :y taxis) (and (< (vy (aabb-min aabb)) (vy ta)) (< (vy ta) (vy (aabb-max aabb)))))
+                     (or (eq :z taxis) (and (< (vz (aabb-min aabb)) (vz ta)) (< (vz ta) (vz (aabb-max aabb))))))
             tmax)))))
 
 (defun ray-triangle (p dir a b c)
   (let* ((ab (v- b a))
          (ac (v- c a))
+         (ap (v- p a))
          (n (vc ab ac))
          (d (- (v. dir n)))
          (ood (/ d))
          (tt (* ood (v. ap n))))
     (when (<= 0 tt)
-      (let ((e (v- (vc dir ap)))
-            (v (* (v. ac e) ood)))
+      (let* ((e (v- (vc dir ap)))
+             (v (* (v. ac e) ood)))
         (when (<= 0.0 v 1.0)
           (let ((w (- (* (v. ab e) ood))))
             (when (and (<= 0.0 w) (<= (+ v w) 1.0))
@@ -562,7 +554,7 @@
         (min-p (vec +1.0e15 +1.0e15 +1.0e15))
         (max-p (vec -1.0e15 -1.0e15 -1.0e15)))
     (cond ((<= count 8)
-           (let ((clump (make-aabb-node :count count)))
+           (let ((clump (make-aabb-node  :count count)))
              (dotimes (i count)
                (setf (aref (aabb-node-indices clump) i) (+ i start base))
                (setf min-p (vmin min-p (aref points (+ i start))))
@@ -1163,7 +1155,7 @@
                                  :m1 (voxel-hull-m1 parent)
                                  :m2 (voxel-hull-m2 parent)
                                  :parameters (voxel-hull-parameters parent))))
-    (ecase axis
+    (case axis
       (:x- (setf (vx (voxel-hull-m2 hull)) split-loc))
       (:x+ (setf (vx (voxel-hull-m1 hull)) (1+ split-loc)))
       (:y- (setf (vy (voxel-hull-m2 hull)) split-loc))
@@ -1173,8 +1165,8 @@
     ;; Copy all intersecting interior voxels
     (loop for v across (voxel-hull-interior-voxels parent)
           for va = (voxel-array v)
-          do (when (and (every #'<= (voxel-hull-m1 hull) v)
-                        (every #'<= v (voxel-hull-m2 hull)))
+          do (when (and (every #'<= (voxel-hull-m1 hull) va)
+                        (every #'<= va (voxel-hull-m2 hull)))
                (if (ecase axis
                      (:x- (= (aref va 0) split-loc))
                      (:x+ (= (aref va 0) (aref (voxel-hull-m1 hull) 0)))
@@ -1187,13 +1179,13 @@
     ;; Copy all intersecting surface voxels
     (loop for v across (voxel-hull-surface-voxels parent)
           for va = (voxel-array v)
-          do (when (and (every #'<= (voxel-hull-m1 hull) v)
-                        (every #'<= v (voxel-hull-m2 hull)))
+          do (when (and (every #'<= (voxel-hull-m1 hull) va)
+                        (every #'<= va (voxel-hull-m2 hull)))
                (vector-push-extend v (voxel-hull-surface-voxels hull))))
     (loop for v across (voxel-hull-new-surface-voxels parent)
           for va = (voxel-array v)
-          do (when (and (every #'<= (voxel-hull-m1 hull) v)
-                        (every #'<= v (voxel-hull-m2 hull)))
+          do (when (and (every #'<= (voxel-hull-m1 hull) va)
+                        (every #'<= va (voxel-hull-m2 hull)))
                (vector-push-extend v (voxel-hull-new-surface-voxels hull))))
     ;; Recompute the bounding box
     (fill (voxel-hull-m1 hull) #x7FFFFFFF)
@@ -1244,13 +1236,13 @@
       ;; TODO: Ech.
       (setf (voxel-hull-convex-hull hull) (make-convex-hull* verts faces))))
   (when (voxel-hull-convex-hull hull)
-    (setf (voxel-hull-hull-volume hull) (convex-hull-volume (voxel-hull-convex-hull hull))))
+    (setf (voxel-hull-volume hull) (convex-hull-volume (voxel-hull-convex-hull hull))))
   (let ((single-voxel-volume (expt (voxel-hull-voxel-scale hull) 3))
         (voxel-count (+ (length (voxel-hull-interior-voxels hull))
                         (length (voxel-hull-surface-voxels hull))
                         (length (voxel-hull-new-surface-voxels hull)))))
     (setf (voxel-hull-voxel-volume hull) (* voxel-count single-voxel-volume))
-    (setf (voxel-hull-volume-error hull) (/ (* (abs (- (voxel-hull-hull-volume hull) (voxel-hull-voxel-volume hull)))
+    (setf (voxel-hull-volume-error hull) (/ (* (abs (- (voxel-hull-volume hull) (voxel-hull-voxel-volume hull)))
                                                100)
                                             (voxel-hull-voxel-volume hull)))))
 
@@ -1339,14 +1331,14 @@
     (multiple-value-bind (axis split-location) (compute-split-plane hull)
       (ecase axis
         (:x
-         (setf (voxel-hull-hull-a hull) (make-voxel-hull hull :x- split-location))
-         (setf (voxel-hull-hull-b hull) (make-voxel-hull hull :x+ split-location)))
+         (setf (voxel-hull-a hull) (make-voxel-hull hull :x- split-location))
+         (setf (voxel-hull-b hull) (make-voxel-hull hull :x+ split-location)))
         (:y
-         (setf (voxel-hull-hull-a hull) (make-voxel-hull hull :y- split-location))
-         (setf (voxel-hull-hull-b hull) (make-voxel-hull hull :y+ split-location)))
+         (setf (voxel-hull-a hull) (make-voxel-hull hull :y- split-location))
+         (setf (voxel-hull-b hull) (make-voxel-hull hull :y+ split-location)))
         (:z
-         (setf (voxel-hull-hull-a hull) (make-voxel-hull hull :z- split-location))
-         (setf (voxel-hull-hull-b hull) (make-voxel-hull hull :z+ split-location))))))
+         (setf (voxel-hull-a hull) (make-voxel-hull hull :z- split-location))
+         (setf (voxel-hull-b hull) (make-voxel-hull hull :z+ split-location))))))
   hull)
 
 (defun reduce-convex-hull (decomposer ch &key (max-vertices (max-vertices-per-convex-hull (decomposer-parameters decomposer)))
@@ -1360,7 +1352,7 @@
 (defun compute-concavity (volume-separate volume-combined volume-mesh)
   (/ (abs (- volume-separate volume-combined)) volume-mesh))
 
-(defun perform-merge-cost-task (decomposer task)
+(defun perform-task (decomposer task)
   (let* ((a (cost-task-a task))
          (b (cost-task-b task))
          (va (convex-hull-volume a))
@@ -1398,33 +1390,99 @@
     hull))
 
 (defun %decompose (decomposer)
-  ;; CopyInputMesh
-  (let* ((bounds (aabb-bounds (decomposer-vertices decomposer)))
+  ;; Prepare the necessary data
+  (let* ((params (decomposer-parameters decomposer))
+         (pending (make-array 0 :adjustable T :fill-pointer T))
+         (voxel-hulls (make-array 0 :adjustable T :fill-pointer T))
+         (hulls (make-array 0 :adjustable T :fill-pointer T))
+         (max-convex-hull-fragments 100000)
+         (bounds (aabb-bounds (decomposer-vertices decomposer)))
          (center (aabb-center bounds)))
     (setf (decomposer-center decomposer) center)
     (setf (decomposer-scale decomposer) (vmaxcoeff (v- (aabb-max bounds) (aabb-min bounds))))
     (setf (decomposer-recip-scale decomposer) (if (= 0 (decomposer-scale decomposer))
                                                   0.0
-                                                  (decomposer-scale decomposer))))
-  ;; IMPL:
-  ;; ???? Don't understand this fuckery with VertexIndex and how it relates to a kd-tree
-  ;;
-  (setf (decomposer-aabb-tree decomposer) (make-aabb-tree (decomposer-vertices decomposer)
-                                                          (decomposer-indices decomposer)))
-  (setf (decomposer-voxelize decomposer) (make-volume (decomposer-vertices decomposer)
-                                                      (decomposer-indices decomposer)
-                                                      (resolution (decomposer-parameters decomposer))))
-  (setf (decomposer-voxel-scale decomposer) (volume-scale (decomposer-voxelize decomposer)))
-  (setf (decomposer-voxel-half-scale decomposer) (* 0.5 (decomposer-voxel-scale decomposer)))
-  (setf (decomposer-voxel-bmin decomposer) (aabb-min (decomposer-voxelize decomposer)))
-  (setf (decomposer-voxel-bmax decomposer) (aabb-max (decomposer-voxelize decomposer)))
-  (let ((vh (make-voxel-hull* (decomposer-voxelize decomposer) (decomposer-parameters decomposer))))
-    (when (voxel-hull-convex-hull vh)
-      (setf (decomposer-overall-hull-volume decomposer)
-            (convex-hull-volume (voxel-hull-convex-hull vh))))
-    (vector-push-extend vh (decomposer-pending-hulls decomposer)))
-  ;; Decompose
-  )
+                                                  (decomposer-scale decomposer)))
+    ;; IMPL:
+    ;; ???? Don't understand this fuckery with VertexIndex and how it relates to a kd-tree
+    ;;
+    (setf (decomposer-aabb-tree decomposer) (make-aabb-tree (decomposer-vertices decomposer)
+                                                            (decomposer-indices decomposer)))
+    (setf (decomposer-voxelize decomposer) (make-volume (decomposer-vertices decomposer)
+                                                        (decomposer-indices decomposer)
+                                                        (resolution params)))
+    (setf (decomposer-voxel-scale decomposer) (volume-scale (decomposer-voxelize decomposer)))
+    (let ((vh (make-voxel-hull* (decomposer-voxelize decomposer) params)))
+      (when (voxel-hull-convex-hull vh)
+        (setf (decomposer-overall-hull-volume decomposer)
+              (convex-hull-volume (voxel-hull-convex-hull vh))))
+      (vector-push-extend vh pending)
+      ;; Split hulls as much as possible
+      (loop while (< 0 (length pending))
+            do (let ((count (+ (length pending) (length voxel-hulls)))
+                     (old (copy-seq pending)))
+                 (loop for hull across old
+                       do (unless (or (voxel-hull-complete-p hull) (< max-convex-hull-fragments count))
+                            (perform-plane-split hull)))
+                 (loop for hull across old
+                       do (cond ((or (voxel-hull-complete-p hull) (< max-convex-hull-fragments count))
+                                 (when (voxel-hull-convex-hull hull)
+                                   (vector-push-extend hull voxel-hulls)))
+                                (T
+                                 (when (voxel-hull-a hull)
+                                   (vector-push-extend (voxel-hull-a hull) pending))
+                                 (when (voxel-hull-b hull)
+                                   (vector-push-extend (voxel-hull-b hull) pending))))))))
+    ;; Build the hull ID map
+    (loop for hull across voxel-hulls
+          ;; ?? it does a copy here, but why?
+          for ch = (voxel-hull-convex-hull hull)
+          for id = (length hulls)
+          do (setf (convex-hull-id ch) id)
+             (vector-push-extend ch hulls))
+    ;; Merge convex hulls down as much as needed
+    (let ((hull-count (length hulls)))
+      (when (< (convex-hulls params) hull-count)
+        (let ((tasks (make-array 0 :adjustable T :fill-pointer T)))
+          ;; Compute the costs and init our priority queue
+          (loop for i from 1 below hull-count
+                for ch-a = (aref hulls i)
+                do (loop for j from 0 below i
+                         for ch-b = (aref hulls j)
+                         for task = (make-cost-task ch-a ch-b)
+                         do (unless (fast-cost decomposer task)
+                              (vector-push-extend task tasks))))
+          (loop for task across tasks
+                do (perform-task decomposer task)
+                   (add-cost decomposer task)))
+        ;; Actually merge convex hulls now
+        (loop until (or (priority-queue:pqueue-empty-p (decomposer-hull-pair-queue decomposer))
+                        (<= (convex-hulls params) (length hulls)))
+              do (let* ((pair (priority-queue:pqueue-pop (decomposer-hull-pair-queue decomposer)))
+                        (ch-a (hull-pair-a pair))
+                        (ch-b (hull-pair-b pair)))
+                   (when (and ch-a ch-b)
+                     (let ((combined (combine-convex-hulls ch-a ch-b))
+                           (tasks (make-array 0 :adjustable T :fill-pointer T)))
+                       (setf (convex-hull-id combined) (length hulls))
+                       (loop for hull across hulls
+                             for task = (make-cost-task combined hull)
+                             do (unless (fast-cost decomposer task)
+                                  (vector-push-extend task tasks)))
+                       (vector-push-extend combined hulls)
+                       (loop for task across tasks
+                             do (perform-task decomposer task))
+                       (loop for task across tasks
+                             do (add-cost decomposer task))))))))
+    ;; Finalize by reducing hulls if necessary and scaling them
+    (loop for i from 0 below (length hulls)
+          for hull = (aref hulls i)
+          do (when (or (< (max-vertices-per-convex-hull params)
+                          (truncate (length (convex-hull-points hull)) 3))
+                       (shrink-wrap-p params))
+               (setf (aref hulls i) (setf hull (reduce-convex-hull decomposer hull))))
+             (scale-convex-hull decomposer hull))
+    hulls))
 
 (defun make-decomposer (verts faces &rest args)
   (%make-decomposer verts faces (apply #'make-ch-parameters args)))
@@ -1438,6 +1496,4 @@
                                               minimum-edge-length)
   (declare (ignore convex-hulls resolution error-percentage max-recursion-depth
                    shrink-wrap-p max-vertices-per-convex-hull minimum-edge-length))
-  (let ((decomposer (apply #'make-decomposer verts faces args)))
-    (%decompose decomposer)
-    (decomposer-hulls decomposer)))
+  (%decompose (apply #'make-decomposer verts faces args)))
