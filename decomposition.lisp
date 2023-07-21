@@ -121,8 +121,8 @@
   (minimum-edge-length 2 :type (unsigned-byte 32)))
 
 ;;; Skip Googol implementation
-;;; Skip convex hull implementation
 ;;; Skip kd-tree implementation
+;;; Skip Quickhull implementation
 
 (defstruct (plane
             (:include vec3)
@@ -183,17 +183,6 @@
             (:predicate NIL))
   (mark NIL :type boolean))
 
-(defstruct (aabb-node
-            (:copier NIL)
-            (:predicate NIL))
-  (min (vec 0 0 0) :type vec3)
-  (max (vec 0 0 0) :type vec3)
-  (left NIL :type (or null aabb-node))
-  (right NIL :type (or null aabb-node))
-  (parent NIL :type (or null aabb-node))
-  (count 0 :type fixnum)
-  (indices (make-array 8 :element-type 'fixnum) :type (simple-array fixnum (8))))
-
 (deftype voxel () '(unsigned-byte 32))
 
 (defun make-voxel (x y z)
@@ -202,6 +191,7 @@
 (defun voxel-x (voxel) (ldb (byte 10 20) voxel))
 (defun voxel-y (voxel) (ldb (byte 10 10) voxel))
 (defun voxel-z (voxel) (ldb (byte 10  0) voxel))
+
 (defstruct (normal-map
             (:constructor %make-normal-map ())
             (:copier NIL)
@@ -240,6 +230,18 @@
         (setf count (tessellate-triangle map subdivisions p5 p0 p3 count))
         (setf count (tessellate-triangle map subdivisions p1 p5 p3 count))
         (setf count (tessellate-triangle map subdivisions p4 p1 p3 count))))))
+
+(defstruct (volume
+            (:include aabb)
+            (:constructor %make-volume (data surface-voxels interior-voxels)))
+  (scale 1.0 :type single-float)
+  (dimensions (make-array 3 :element-type '(unsigned-byte 32)) :type (simple-array (unsigned-byte 32) (3)))
+  (voxels-on-surface 0 :type (unsigned-byte 64))
+  (voxels-inside-surface 0 :type (unsigned-byte 64))
+  (voxels-outside-surface 0 :type (unsigned-byte 64))
+  (data NIL :type (simple-array (unsigned-byte 8) (*)))
+  (surface-voxels NIL :type (simple-array voxel (*)))
+  (interior-voxels NIL :type (simple-array voxel (*))))
 
 ;;;; Additional ops
 ;;; They implement strange comparators.
@@ -376,6 +378,59 @@
           (finish (v+ b (v* (v- c b) w)) (- 1 w) (/ (- d4 d3) (+ (- d4 d3) (- d5 d6))))))
       (let* ((denom (/ (+ va vb vc))))
         (finish (v+ a (v* ab v) (v* ac w)) (* vb denom) (* vc denom))))))
+
+(defun plane-box-overlap (normal vertex max-box)
+  (let ((vmin (vec3)) (vmax (vec3)))
+    (macrolet ((test (dim)
+                 `(let ((v (,dim vertex)))
+                    (if (< 0 (,dim normal))
+                        (setf (,dim vmin) (- (- (,dim max-box)) v)
+                              (,dim vmax) (- (,dim max-box)))
+                        (setf (,dim vmin) (- (,dim max-box) v)
+                              (,dim vmax) (- (- (,dim max-box))))))))
+      (test vx3)
+      (test vy3)
+      (test vz3))
+    (and (not (< 0 (v. normal vmin)))
+         (<= 0 (v. normal vmax)))))
+
+(defun axis-test (a b fa fb v0 v1 v2 v3 box-half-size1 box-half-size2)
+  (let* ((p0 (+ (* a v0) (* b v1)))
+         (p1 (+ (* a v2) (* b v3)))
+         (min (min p0 p1))
+         (max (max p0 p1))
+         (rad (+ (* fa box-half-size1) (* fb box-half-size2))))
+    (not (or (< rad min) (< max (- rad))))))
+
+(defun tri-box-overlap (box-center bsize tri0 tri1 tri2)
+  ;; This is SAT.
+  (let* ((v0 (v- tri0 box-center))
+         (v1 (v- tri1 box-center))
+         (v2 (v- tri2 box-center))
+         (e0 (v- v1 v0))
+         (e1 (v- v2 v1))
+         (e2 (v- v0 v2))
+         (fe0 (vabs e0))
+         (fe1 (vabs e1))
+         (fe2 (vabs e2)))
+    (when (and (axis-test (vz e0) (- (vy e0)) (vz fe0) (vy fe0) (vy v0) (vz v0) (vy v2) (vz v2) (vy bsize) (vz bsize))
+               (axis-test (- (vz e0)) (vx e0) (vz fe0) (vx fe0) (vx v0) (vz v0) (vx v2) (vz v2) (vx bsize) (vz bsize))
+               (axis-test (vy e0) (- (vx e0)) (vy fe0) (vx fe0) (vx v1) (vy v1) (vx v2) (vy v2) (vx bsize) (vy bsize))
+
+               (axis-test (vz e1) (- (vy e1)) (vz fe1) (vy fe1) (vy v0) (vz v0) (vy v2) (vz v2) (vy bsize) (vz bsize))
+               (axis-test (- (vz e1)) (vx e1) (vz fe1) (vx fe1) (vx v0) (vz v0) (vx v2) (vz v2) (vx bsize) (vz bsize))
+               (axis-test (vy e1) (- (vx e1)) (vy fe1) (vx fe1) (vx v0) (vy v0) (vx v1) (vy v1) (vx bsize) (vz bsize))
+
+               (axis-test (vz e2) (- (vy e2)) (vz fe2) (vy fe2) (vy v0) (vz v0) (vy v1) (vz v1) (vy bsize) (vz bsize))
+               (axis-test (- (vz e2)) (vx e2) (vz fe2) (vx fe2) (vx v0) (vz v0) (vx v1) (vz v1) (vx bsize) (vz bsize))
+               (axis-test (vy e2) (- (vx e2)) (vy fe2) (vx fe2) (vx v1) (vy v1) (vx v2) (vy v2) (vx bsize) (vy bsize)))
+      (macrolet ((test (dim)
+                   `(let ((min (min (,dim v0) (,dim v1) (,dim v2)))
+                          (max (max (,dim v0) (,dim v1) (,dim v2))))
+                      (not (or (< (,dim bsize) min) (< max (- (,dim bsize))))))))
+        (when (and (test vx3) (test vy3) (test vz3))
+          (let ((normal (vc e0 e1)))
+            (plane-box-overlap normal v0 bsize)))))))
 
 ;;; Actual algorithm
 
@@ -809,7 +864,11 @@
                      (< a b)))))
       ;; KLUDGE: This SUUUUUCKS
       #-sbcl
-      (sort (make-array (- end start) :displaced-to faces :displaced-index-offset start) #'compare)
+      (let ((sub (make-array (- end start)
+                             :element-type (array-element-type faces)
+                             :displaced-to faces
+                             :displaced-index-offset start)))
+        (replace faces (sort sub #'compare) :start1 start))
       #+sbcl
       (sb-impl::with-array-data ((vector (the vector faces))
                                  (start start)
@@ -817,3 +876,5 @@
                                  :check-fill-pointer t)
         (sb-impl::sort-vector vector start end #'compare NIL))
       (truncate (- end start) 2))))
+
+
