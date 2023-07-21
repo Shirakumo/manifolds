@@ -154,6 +154,13 @@
   (let ((v (vc (v- p1 p0) (v- p2 p0))))
     (plane (vx3 v) (vy3 v) (vz3 v) (- (v. p0 p0)))))
 
+(defstruct (vertex-index
+            (:include vec3)
+            (:constructor make-vertex-index (3d-vectors::%vx3 3d-vectors::%vy3 3d-vectors::%vz3 index))
+            (:copier NIL)
+            (:predicate NIL))
+  (index 0 :type (unsigned-byte 32)))
+
 (deftype voxel () '(unsigned-byte 32))
 
 (defun make-voxel (x y z)
@@ -230,7 +237,7 @@
   (concavity 0.0 :type single-float))
 
 (defstruct (decomposer
-            (:constructor %make-decomposer (vertices indices parameters))
+            (:constructor %make-decomposer (parameters))
             (:copier NIL)
             (:predicate NIL))
   (aabb-tree NIL :type (or null aabb-tree))
@@ -238,8 +245,6 @@
   (center (vec3) :type vec3)
   (scale 1.0 :type single-float)
   (recip-scale 1.0 :type single-float)
-  (vertices NIL :type (simple-array single-float (*)))
-  (indices NIL :type (simple-array (unsigned-byte 32) (*)))
   (overall-hull-volume 0.0 :type single-float)
   (voxel-scale 0.0 :type single-float)
   (parameters NIL :type ch-parameters)
@@ -989,29 +994,56 @@
     (setf (convex-hull-center hull) (centroid verts faces))
     hull))
 
-(defun %decompose (decomposer)
+(defun normalize (decomposer vertices indices)
+  (let ((tree)
+        (new-vertices (make-array 0 :element-type 'single-float :adjustable T :fill-pointer T))
+        (new-indices (make-array 0 :element-type '(unsigned-byte 32) :adjustable T :fill-pointer T)))
+    (flet ((vertex-idx (p)
+             (let* ((p (nv* (nv- p (decomposer-center decomposer))
+                            (decomposer-recip-scale decomposer)))
+                    (nearest (org.shirakumo.fraf.trial.space.kd-tree:kd-tree-nearest p tree :max-radius 0.001)))
+               (cond (nearest
+                      (vertex-index-index nearest))
+                     (T
+                      (let ((index (truncate (length new-vertices) 3)))
+                        (org.shirakumo.fraf.trial.space.kd-tree:kd-tree-insert
+                         (make-vertex-index (vx p) (vy p) (vz p) index) tree)
+                        (vector-push-extend (vx p) new-vertices)
+                        (vector-push-extend (vy p) new-vertices)
+                        (vector-push-extend (vz p) new-vertices)
+                        index))))))
+      (loop for i from 0 below (length indices) by 3
+            for p1 = (v vertices (aref indices (+ i 0)))
+            for p2 = (v vertices (aref indices (+ i 1)))
+            for p3 = (v vertices (aref indices (+ i 2)))
+            for i1 = (vertex-idx p1)
+            for i2 = (vertex-idx p2)
+            for i3 = (vertex-idx p3)
+            do (unless (or (= i1 i2) (= i1 i3) (= i2 i3))
+                 (vector-push-extend i1 new-indices)
+                 (vector-push-extend i2 new-indices)
+                 (vector-push-extend i3 new-indices))))
+    (values (replace (make-array (length new-vertices) :element-type 'single-float) new-vertices)
+            (replace (make-array (length new-indices) :element-type '(unsigned-byte 32)) new-indices))))
+
+(defun %decompose (decomposer vertices indices)
   ;; Prepare the necessary data
   (let* ((params (decomposer-parameters decomposer))
          (pending (make-array 0 :adjustable T :fill-pointer T))
          (voxel-hulls (make-array 0 :adjustable T :fill-pointer T))
          (hulls (make-array 0 :adjustable T :fill-pointer T))
          (max-convex-hull-fragments 100000)
-         (bounds (aabb-bounds (decomposer-vertices decomposer)))
+         (bounds (aabb-bounds vertices))
          (center (aabb-center bounds)))
     (setf (decomposer-center decomposer) center)
     (setf (decomposer-scale decomposer) (vmaxcoeff (v- (aabb-max bounds) (aabb-min bounds))))
     (setf (decomposer-recip-scale decomposer) (if (= 0 (decomposer-scale decomposer))
                                                   0.0
                                                   (decomposer-scale decomposer)))
-    ;; IMPL:
-    ;; ???? Don't understand this fuckery with VertexIndex and how it relates to a kd-tree
-    ;;
-    (setf (decomposer-aabb-tree decomposer) (make-aabb-tree (decomposer-vertices decomposer)
-                                                            (decomposer-indices decomposer)))
-    (setf (decomposer-voxelize decomposer) (make-volume (decomposer-vertices decomposer)
-                                                        (decomposer-indices decomposer)
-                                                        (resolution params)))
-    (setf (decomposer-voxel-scale decomposer) (volume-scale (decomposer-voxelize decomposer)))
+    (multiple-value-bind (vertices indices) (normalize decomposer vertices indices)
+      (setf (decomposer-aabb-tree decomposer) (make-aabb-tree vertices indices))
+      (setf (decomposer-voxelize decomposer) (make-volume vertices indices (resolution params)))
+      (setf (decomposer-voxel-scale decomposer) (volume-scale (decomposer-voxelize decomposer))))
     (let ((vh (make-voxel-hull* (decomposer-voxelize decomposer) params)))
       (when (voxel-hull-convex-hull vh)
         (setf (decomposer-overall-hull-volume decomposer)
@@ -1085,7 +1117,7 @@
     hulls))
 
 (defun make-decomposer (verts faces &rest args)
-  (%make-decomposer verts faces (apply #'make-ch-parameters args)))
+  (%make-decomposer (apply #'make-ch-parameters args)))
 
 (defun decompose (verts faces &rest args &key convex-hulls
                                               resolution
@@ -1096,4 +1128,4 @@
                                               minimum-edge-length)
   (declare (ignore convex-hulls resolution error-percentage max-recursion-depth
                    shrink-wrap-p max-vertices-per-convex-hull minimum-edge-length))
-  (%decompose (apply #'make-decomposer verts faces args)))
+  (%decompose (apply #'make-decomposer verts faces args) verts faces))
