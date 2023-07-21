@@ -134,6 +134,36 @@
         numerator
         (nv* numerator (/ denominator)))))
 
+(defun determinant3x3 (a b c)
+  (let ((a01xa12 (* (vy3 a) (vz3 b)))
+        (a02xa11 (* (vz3 a) (vy3 b)))
+        (a00xa12 (* (vx3 a) (vz3 b)))
+        (a02xa10 (* (vz3 a) (vx3 b)))
+        (a00xa11 (* (vx3 a) (vy3 b)))
+        (a01xa10 (* (vy3 a) (vx3 b))))
+    (values (+ (* (- a01xa12 a02xa11) (vx3 c))
+               (- (* (- a00xa12 a02xa10) (vy3 c)))
+               (* (- a00xa11 a01xa10) (vz3 c)))
+            (+ (+ (abs a01xa12) (* (abs a02xa11) (abs (vX3 c))))
+               (+ (abs a00xa12) (* (abs a02xa10) (abs (vY3 c))))
+               (+ (abs a00xa11) (* (abs a01xa10) (abs (vZ3 c))))))))
+
+(defun convex-volume (vertices faces)
+  (let ((bary (vec3)))
+    (loop for i from 0 below (length vertices) by 3
+          do (incf (vx bary) (aref vertices (+ i 0)))
+             (incf (vy bary) (aref vertices (+ i 1)))
+             (incf (vz bary) (aref vertices (+ i 2))))
+    (nv/ bary (truncate (length vertices) 3))
+    (flet ((volume4 (a b c d)
+             (v. (v- a d) (vc (v- b d) (v- c d)))))
+      (/ (loop for i from 0 below (length faces) by 3
+               sum (volume4 (v vertices (aref faces (+ i 0)))
+                            (v vertices (aref faces (+ i 1)))
+                            (v vertices (aref faces (+ i 2)))
+                            bary))
+         6.0))))
+
 (defun closest-point-on-triangle (vertices faces face point)
   (let* ((v0 (v vertices (aref faces (+ 0 (* face 3)))))
          (e0 (nv- (v vertices (aref faces (+ 1 (* face 3)))) v0))

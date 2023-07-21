@@ -15,5 +15,6 @@
   :depends-on (:3d-vectors
                :3d-spaces
                :quickhull
+               :priority-queue
                :documentation-utils)
   :in-order-to ((asdf:test-op (asdf:test-op :manifolds-test))))

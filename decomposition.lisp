@@ -27,6 +27,9 @@
   (min (vec 0 0 0) :type vec3)
   (max (vec 0 0 0) :type vec3))
 
+(defun copy-aabb (a)
+  (make-aabb (vcopy (aabb-min a)) (vcopy (aabb-max a))))
+
 (defun aabb-union (a b)
   (make-aabb (vmin (aabb-min a) (aabb-min b))
              (vmax (aabb-max a) (aabb-max b))))
@@ -72,6 +75,24 @@
         (if (< y z) 2 1)
         (if (< x z) 2 0))))
 
+(defun aabb-bounds (vertices &optional (aabb (make-aabb)))
+  (let ((min (aabb-min aabb))
+        (max (aabb-max aabb)))
+    (setf (vx min) (setf (vx max) (aref vertices 0)))
+    (setf (vy min) (setf (vy max) (aref vertices 1)))
+    (setf (vz min) (setf (vz max) (aref vertices 2)))
+    (loop for i from 3 below (length vertices) by 3
+          for x = (aref vertices (+ i 0))
+          for y = (aref vertices (+ i 1))
+          for z = (aref vertices (+ i 2))
+          do (setf (vx min) (min (vx min) x))
+             (setf (vy min) (min (vy min) y))
+             (setf (vz min) (min (vz min) z))
+             (setf (vx max) (max (vx max) x))
+             (setf (vy max) (max (vy max) y))
+             (setf (vz max) (max (vz max) z)))
+    aabb))
+
 (defstruct (aabb-node
             (:include aabb)
             (:constructor make-aabb-node)
@@ -94,14 +115,14 @@
   (leaf-nodes 0 :type (unsigned-byte 32)))
 
 (defstruct (convex-hull
-            (:constructor %make-convex-hull ())
+            (:constructor %make-convex-hull)
             (:include aabb)
             (:copier NIL)
             (:predicate NIL))
   (id 0 :type (unsigned-byte 32))
   (points (make-array 0 :adjustable T :fill-pointer T) :type vector)
   (triangles (make-array 0 :adjustable T :fill-pointer T) :type vector)
-  (volume 0d0 :type double-float)
+  (volume 0d0 :type single-float)
   (center (vec 0 0 0) :type vec3)
   ;; Private
   (list () :type list)
@@ -111,12 +132,13 @@
 
 (defstruct (ch-parameters
             (:copier NIL)
-            (:predicate NIL))
+            (:predicate NIL)
+            (:conc-name NIL))
   (convex-hulls 64 :type (unsigned-byte 32))
   (resolution 400000 :type (unsigned-byte 32))
   (error-percentage 1.0 :type single-float)
   (max-recursion-depth 10 :type (unsigned-byte 32))
-  (shrink-wrap T :type boolean)
+  (shrink-wrap-p T :type boolean)
   (max-vertices-per-convex-hull 64 :type (unsigned-byte 32))
   (minimum-edge-length 2 :type (unsigned-byte 32)))
 
@@ -183,15 +205,6 @@
             (:predicate NIL))
   (mark NIL :type boolean))
 
-(deftype voxel () '(unsigned-byte 32))
-
-(defun make-voxel (x y z)
-  (logior (ash x 20) (ash y 10) (ash z 0)))
-
-(defun voxel-x (voxel) (ldb (byte 10 20) voxel))
-(defun voxel-y (voxel) (ldb (byte 10 10) voxel))
-(defun voxel-z (voxel) (ldb (byte 10  0) voxel))
-
 (defstruct (normal-map
             (:constructor %make-normal-map ())
             (:copier NIL)
@@ -231,17 +244,104 @@
         (setf count (tessellate-triangle map subdivisions p1 p5 p3 count))
         (setf count (tessellate-triangle map subdivisions p4 p1 p3 count))))))
 
+(deftype voxel () '(unsigned-byte 32))
+
+(defun make-voxel (x y z)
+  (logior (ash x 20) (ash y 10) (ash z 0)))
+
+(defun voxel-array (voxel)
+  (let ((v (make-array 3 :element-type '(unsigned-byte 10))))
+    (setf (aref v 0) (voxel-x voxel))
+    (setf (aref v 1) (voxel-y voxel))
+    (setf (aref v 2) (voxel-z voxel))
+    v))
+
+(defun voxel-x (voxel) (ldb (byte 10 20) voxel))
+(defun voxel-y (voxel) (ldb (byte 10 10) voxel))
+(defun voxel-z (voxel) (ldb (byte 10  0) voxel))
+
 (defstruct (volume
             (:include aabb)
-            (:constructor %make-volume (data surface-voxels interior-voxels)))
+            (:constructor %make-volume)
+            (:copier NIL)
+            (:predicate NIL))
   (scale 1.0 :type single-float)
   (dimensions (make-array 3 :element-type '(unsigned-byte 32)) :type (simple-array (unsigned-byte 32) (3)))
   (voxels-on-surface 0 :type (unsigned-byte 64))
   (voxels-inside-surface 0 :type (unsigned-byte 64))
   (voxels-outside-surface 0 :type (unsigned-byte 64))
-  (data NIL :type (simple-array (unsigned-byte 8) (*)))
-  (surface-voxels NIL :type (simple-array voxel (*)))
-  (interior-voxels NIL :type (simple-array voxel (*))))
+  (data (make-array 0 :element-type '(unsigned-byte 8)) :type (simple-array (unsigned-byte 8) (*)))
+  (surface-voxels (make-array 0 :element-type 'voxel :adjustable T :fill-pointer T) :type (vector voxel))
+  (interior-voxels (make-array 0 :element-type 'voxel :adjustable T :fill-pointer T) :type (vector voxel)))
+
+(defstruct (voxel-hull
+            (:include aabb)
+            (:constructor %make-voxel-hull)
+            (:copier NIL)
+            (:predicate NIL))
+  (axis :x- :type (member :x- :x+ :y- :y+ :z- :z+))
+  (voxels (make-array 0 :adjustable T :fill-pointer T) :type vector)
+  (voxel-scale 0.0 :type single-float)
+  (voxel-scale-half 0.0 :type single-float)
+  (voxel-adjust (vec 0 0 0) :type vec3)
+  (depth 0 :type (unsigned-byte 32))
+  (index 0 :type (unsigned-byte 32))
+  (volume-error 0.0 :type single-float)
+  (voxel-volume 0.0 :type single-float)
+  (hull-volume 0.0 :type single-float)
+  (convex-hull NIL :type (or null convex-hull))
+  (surface-voxels (make-array 0 :element-type 'voxel :adjustable T :fill-pointer T) :type (vector voxel))
+  (new-surface-voxels (make-array 0 :element-type 'voxel :adjustable T :fill-pointer T) :type (vector voxel))
+  (interior-voxels (make-array 0 :element-type 'voxel :adjustable T :fill-pointer T) :type (vector voxel))
+  (hull-a NIL :type (or null voxel-hull))
+  (hull-b NIL :type (or null voxel-hull))
+  (m1 (make-array 3 :element-type '(unsigned-byte 32)) :type (simple-array (unsigned-byte 32) (3)))
+  (m2 (make-array 3 :element-type '(unsigned-byte 32)) :type (simple-array (unsigned-byte 32) (3)))
+  (aabb-tree NIL :type (or null aabb-tree))
+  (voxel-index-map (make-hash-table :test 'eql) :type hash-table)
+  (vertices (make-array 0 :element-type 'single-float :adjustable T :fill-pointer T) :type (vector single-float))
+  (indices (make-array 0 :element-type '(unsigned-byte 32) :adjustable T :fill-pointer T) :type (vector (unsigned-byte 32)))
+  (voxel-hull-count 0 :type (unsigned-byte 32))
+  (parameters NIL :type ch-parameters))
+
+(defstruct (cost-task
+            (:constructor make-cost-task)
+            (:copier NIL)
+            (:predicate NIL))
+  (decomposer NIL :type decomposer)
+  (a NIL :type (or null convex-hull))
+  (b NIL :type (or null convex-hull))
+  (concavity 0.0 :type single-float))
+
+(defstruct (hull-pair
+            (:constructor make-hull-pair (a b concavity))
+            (:copier NIL)
+            (:predicate NIL))
+  a b (concavity 0.0 :type single-float))
+
+(defstruct (decomposer
+            (:constructor %make-decomposer (vertices indices parameters))
+            (:copier NIL)
+            (:predicate NIL))
+  (convex-hulls (make-array 0 :adjustable T :fill-pointer T) :type vector)
+  (voxel-hulls (make-array 0 :adjustable T :fill-pointer T) :type vector)
+  (pending-hulls (make-array 0 :adjustable T :fill-pointer T) :type vector)
+  (trees (make-array 0 :adjustable T :fill-pointer T) :type vector)
+  (aabb-tree NIL :type (or null aabb-tree))
+  (voxelize NIL :type (or null volume))
+  (center (vec3) :type vec3)
+  (scale 1.0 :type single-float)
+  (recip-scale 1.0 :type single-float)
+  (vertices NIL :type (simple-array single-float (*)))
+  (indices NIL :type (simple-array (unsigned-byte 32) (*)))
+  (overall-hull-volume 0.0 :type single-float)
+  (voxel-scale 0.0 :type single-float)
+  (voxel-half-scale 0.0 :type single-float)
+  (voxel-bmin (vec3) :type vec3)
+  (voxel-bmax (vec3) :type vec3)
+  (parameters NIL :type ch-parameters)
+  (hull-pair-queue (priority-queue:make-pqueue #'<= :key-type 'single-float) :type priority-queue::pqueue)
+  (hulls () :type list))
 
 ;;;; Additional ops
 ;;; They implement strange comparators.
@@ -270,25 +370,6 @@
         (if (< x z)
             (values z :z)
             (values x :x)))))
-
-(defun determinant3x3 (a b c)
-  (let ((a01xa12 (* (vy3 a) (vz3 b)))
-        (a02xa11 (* (vz3 a) (vy3 b)))
-        (a00xa12 (* (vx3 a) (vz3 b)))
-        (a02xa10 (* (vz3 a) (vx3 b)))
-        (a00xa11 (* (vx3 a) (vy3 b)))
-        (a01xa10 (* (vy3 a) (vx3 b))))
-    (values (+ (* (- a01xa12 a02xa11) (vx3 c))
-               (- (* (- a00xa12 a02xa10) (vy3 c)))
-               (* (- a00xa11 a01xa10) (vz3 c)))
-            (+ (+ (abs a01xa12) (* (abs a02xa11) (abs (vX3 c))))
-               (+ (abs a00xa12) (* (abs a02xa10) (abs (vY3 c))))
-               (+ (abs a00xa11) (* (abs a01xa10) (abs (vZ3 c))))))))
-
-(defun mesh-volume (vertices faces)
-  (let ((volume 0d0))
-    (do-faces (a b c faces (abs (* volume (/ 1 6))))
-      (incf volume (determinant3x3 (v vertices a) (v vertices b) (v vertices c))))))
 
 (defun tetrahedrum-volume (p0 p1 p2 p3)
   (v. (v- p3 p0) (vc (v- p1 p0) (v- p2 p0))))
@@ -447,6 +528,18 @@
       (when (<= 4 (length (convex-hull-points hull)))
         (calculate-convex-hull-3d hull points count dist-to-l max-vertex-count))
       hull)))
+
+(defun make-convex-hull* (verts faces)
+  (%make-convex-hull :points verts :triangles faces 
+                     :center (centroid verts faces)
+                     :volume (convex-volume verts faces)))
+
+(defun combine-convex-hulls (a b)
+  (multiple-value-bind (verts faces) 
+      (org.shirakumo.fraf.quickhull:convex-hull
+       (concatenate '(simple-array (unsigned-byte 32))
+                    (convex-hull-points a) (convex-hull-points b)))
+    (make-convex-hull* verts faces)))
 
 (defun unique-points (points)
   (setf points (sort points #'v<))
@@ -873,8 +966,478 @@
       (sb-impl::with-array-data ((vector (the vector faces))
                                  (start start)
                                  (end end)
-                                 :check-fill-pointer t)
+                                 :check-fill-pointer T)
         (sb-impl::sort-vector vector start end #'compare NIL))
       (truncate (- end start) 2))))
 
+(declaim (inline voxel-value))
+(defun voxel-value (v)
+  (ecase v
+    (0 :undefined)
+    (1 :outside-surface-to-walk)
+    (2 :outside-surface)
+    (3 :inside-surface)
+    (4 :on-surface)
+    (:undefined 0)
+    (:outside-surface-to-walk 1)
+    (:outside-surface 2)
+    (:inside-surface 3)
+    (:on-surface 4)))
 
+(defun voxel (volume x y z)
+  (let ((dims (volume-dimensions volume)))
+    (aref (volume-data volume)
+          (+ x (* (aref dims 0) (+ y (* z (aref dims 1))))))))
+
+(defmacro with-voxel-walk ((i i0 i1) (j j0 j1) (k k0 k1) &body body)
+  `(macrolet ((voxel-idx (x y z)
+                `(+ ,x (* (aref dims 0) (+ ,y (* (aref dims 1) ,z)))))
+              (voxel (x y z)
+                `(aref data (voxel-idx ,x ,y ,z))))
+     (loop for ,i from ,i0 below ,i1
+           do (loop for ,j from ,j0 below ,j1
+                    do (loop for ,k from ,k0 below ,k1
+                             do ,@body)))))
+
+(defun make-volume (points indices dimensions)
+  (let* ((a (expt dimensions 0.33))
+         (dim (max 32 (truncate (* a 1.5))))
+         (bounds (aabb-bounds points))
+         (d (aabb-size bounds))
+         (dims (make-array 3 :element-type '(unsigned-byte 32)))
+         (r 0.0))
+    (cond ((and (<= (vy d) (vx d)) (<= (vz d) (vx d)))
+           (replace dims (list dim
+                               (+ 2 (truncate (* dim (vy d)) (vx d)))
+                               (+ 2 (truncate (* dim (vz d)) (vx d)))))
+           (setf r (vx d)))
+          ((and (<= (vx d) (vy d)) (<= (vz d) (vx d)))
+           (replace dims (list dim
+                               (+ 2 (truncate (* dim (vx d)) (vy d)))
+                               (+ 2 (truncate (* dim (vz d)) (vy d)))))
+           (setf r (vy d)))
+          (T
+           (replace dims (list dim
+                               (+ 2 (truncate (* dim (vx d)) (vz d)))
+                               (+ 2 (truncate (* dim (vy d)) (vz d)))))
+           (setf r (vz d))))
+    (let* ((scale (/ r (1- dim)))
+           (inv-scale (/ (1- dim) r))
+           (data (make-array (* (aref dims 0) (aref dims 1) (aref dims 2)) 
+                             :element-type '(unsigned-byte 8) :initial-element 0))
+           (volume (%make-volume :min (aabb-min bounds) :max (aabb-max bounds)
+                                 :scale scale :dimensions dims :data data))
+           (p (map-into (make-array 3) #'vec3)))
+      (loop for base-index from 0 below (length indices) by 3
+            for i0 = 0 for j0 = 0 for k0 = 0
+            for i1 = 0 for j1 = 0 for k1 = 0
+            do (loop for c from 0 below 3
+                     for pt = (v points (aref indices (+ base-index c)))
+                     do (setf (aref p c) (nv* (v- pt (aabb-min bounds)) inv-scale))
+                        (let ((i (truncate (+ 0.5 (vx (aref p c)))))
+                              (j (truncate (+ 0.5 (vx (aref p c)))))
+                              (k (truncate (+ 0.5 (vx (aref p c))))))
+                          (cond ((= 0 c)
+                                 (setf i0 i i1 i)
+                                 (setf j0 j j1 j)
+                                 (setf k0 k k1 k))
+                                (T
+                                 (setf i0 (min i0 i) i1 (max i1 i))
+                                 (setf j0 (min j0 j) j1 (max j1 j))
+                                 (setf k0 (min k0 k) k1 (max k1 k))))))
+               (when (< 0 i0) (decf i0))
+               (when (< 0 j0) (decf j0))
+               (when (< 0 k0) (decf k0))
+               (when (< i1 (aref dims 0)) (incf i1))
+               (when (< j1 (aref dims 1)) (incf j1))
+               (when (< k1 (aref dims 2)) (incf k1))
+               (with-voxel-walk (i i0 i1) (j j0 j1) (k k0 k1)
+                 (when (and (tri-box-overlap (vec i j k) (vec 0.5 0.5 0.5) (aref p 0) (aref p 1) (aref p 2))
+                            (= 0 (voxel i j k)))
+                   (setf (voxel i j k) (voxel-value :on-surface))
+                   (incf (volume-voxels-on-surface volume))
+                   (vector-push-extend (make-voxel i j k) (volume-surface-voxels volume)))))
+      (mark-outside-surface volume 0 0 0 (aref dims 0) (aref dims 1) 1)
+      (mark-outside-surface volume 0 0 (1- (aref dims 2)) (aref dims 0) (aref dims 1) (aref dims 2))
+      (mark-outside-surface volume 0 0 0 (aref dims 0) 1 (aref dims 2))
+      (mark-outside-surface volume 0 (1- (aref dims 1)) 0 (aref dims 0) (aref dims 1) (aref dims 2))
+      (mark-outside-surface volume 0 0 0 1 (aref dims 1) (aref dims 2))
+      (mark-outside-surface volume (1- (aref dims 0)) 0 0 (aref dims 0) (aref dims 1) (aref dims 2))
+      (fill-outside-surface volume)
+      (fill-inside-surface volume))))
+
+(defun mark-outside-surface (volume i0 j0 k0 i1 j1 k1)
+  (let ((data (volume-data volume))
+        (dims (volume-dimensions volume)))
+    (with-voxel-walk (i i0 i1) (j j0 j1) (k k0 k1)
+      (when (= 0 (voxel i j k))
+        (setf (voxel i j k) (voxel-value :outside-surface-to-walk))))))
+
+(defun walk-forward (data data-i start end stride max-distance)
+  (loop for i from start below end
+        for count from 0 below max-distance
+        while (= 0 (aref data data-i))
+        do (setf (aref data data-i) (voxel-value :outside-surface-to-walk))
+           (incf data-i stride))
+  data-i)
+
+(defun walk-backward (data data-i start end stride max-distance)
+  (loop for i downfrom start to end
+        for count from 0 below max-distance
+        while (= 0 (aref data data-i))
+        do (setf (aref data data-i) (voxel-value :outside-surface-to-walk))
+           (decf data-i stride))
+  data-i)
+
+(defun fill-outside-surface (volume)
+  (let* ((voxels-walked 0)
+         (i1 (aref (volume-dimensions volume) 0))
+         (j1 (aref (volume-dimensions volume) 1))
+         (k1 (aref (volume-dimensions volume) 2))
+         (walk-distance 64)
+         ;; The original code here is bonkers.
+         (istride 1)
+         (jstride i1)
+         (kstride (* i1 j1))
+         (dims (volume-dimensions volume))
+         (data (volume-data volume)))
+    (loop do (setf voxels-walked 0)
+             (with-voxel-walk (i 0 i1) (j 0 j1) (k 0 k1)
+               (when (= (voxel i j k) (voxel-value :outside-surface-to-walk))
+                 (incf voxels-walked)
+                 (setf (voxel i j k) (voxel-value :outside-surface))
+                 
+                 (walk-forward data (+ (voxel-idx i j k) kstride) (1+ k) k1 kstride walk-distance)
+                 (walk-backward data (- (voxel-idx i j k) kstride) (1- k) 0 kstride walk-distance)
+
+                 (walk-forward data (+ (voxel-idx i j k) jstride) (1+ j) j1 jstride walk-distance)
+                 (walk-backward data (- (voxel-idx i j k) jstride) (1- j) 0 jstride walk-distance)
+
+                 (walk-forward data (+ (voxel-idx i j k) istride) (1+ i) i1 kstride walk-distance)
+                 (walk-backward data (- (voxel-idx i j k) istride) (1- i) 0 istride walk-distance)))
+             (incf (volume-voxels-outside-surface volume) voxels-walked)
+          while (/= 0 voxels-walked))
+    volume))
+
+(defun fill-inside-surface (volume)
+  (let* ((i1 (aref (volume-dimensions volume) 0))
+         (j1 (aref (volume-dimensions volume) 1))
+         (k1 (aref (volume-dimensions volume) 2))
+         (dims (volume-dimensions volume))
+         (data (volume-data volume)))
+    (setf (fill-pointer (volume-interior-voxels volume)) 0)
+    (with-voxel-walk (i 0 i1) (j 0 j1) (k 0 k1)
+      (when (= 0 (voxel i j k))
+        (setf (voxel i j k) (voxel-value :inside-surface))
+        (vector-push-extend (make-voxel i j k) (volume-interior-voxels volume))
+        (incf (volume-voxels-inside-surface volume))))
+    volume))
+
+(defun shrink-wrap (verts aabb-tree max-hull-vertex-count distance-threshold shrinkrap-p)
+  (when shrinkrap-p
+    (loop for j from 0 below (truncate (length verts) 3)
+          for p = (v verts j)
+          for closest = (closest-point-within-distance aabb-tree p distance-threshold)
+          do (when closest
+               (setf (aref verts j) closest))))
+  ;; TODO: Ech.
+  ;; HRM. Can we not throw out ConvexHull after all and use our QuickHull lib?... Will have to see.
+  ;; (let ((hull (make-convex-hull verts 0.0001 max-hull-vertex-count)))
+  ;;   )
+  ;; (org.shirakumo.fraf.quickhull:convex-hull verts :max-vertex-count max-hull-vertex-count)
+  )
+
+(defvar *voxel-hull-count* 0)
+
+(defun make-voxel-hull (parent axis split-loc)
+  (let* ((volume (aref (voxel-hull-voxels parent) 0))
+         (hull (%make-voxel-hull :min (aabb-min parent)
+                                 :max (aabb-max parent)
+                                 :axis axis
+                                 :voxels (voxel-hull-voxels parent)
+                                 :voxel-scale (volume-scale volume)
+                                 :voxel-scale-half (* 0.5 (volume-scale volume))
+                                 :voxel-adjust (v- (aabb-min volume) (* 0.5 (volume-scale volume)))
+                                 :depth (1+ (voxel-hull-depth parent))
+                                 :index (incf *voxel-hull-count*)
+                                 :m1 (voxel-hull-m1 parent)
+                                 :m2 (voxel-hull-m2 parent)
+                                 :parameters (voxel-hull-parameters parent))))
+    (ecase axis
+      (:x- (setf (vx (voxel-hull-m2 hull)) split-loc))
+      (:x+ (setf (vx (voxel-hull-m1 hull)) (1+ split-loc)))
+      (:y- (setf (vy (voxel-hull-m2 hull)) split-loc))
+      (:y+ (setf (vy (voxel-hull-m1 hull)) (1+ split-loc)))
+      (:z- (setf (vz (voxel-hull-m2 hull)) split-loc))
+      (:z+ (setf (vz (voxel-hull-m1 hull)) (1+ split-loc))))
+    ;; Copy all intersecting interior voxels
+    (loop for v across (voxel-hull-interior-voxels parent)
+          for va = (voxel-array v)
+          do (when (and (every #'<= (voxel-hull-m1 hull) v)
+                        (every #'<= v (voxel-hull-m2 hull)))
+               (if (ecase axis
+                     (:x- (= (aref va 0) split-loc))
+                     (:x+ (= (aref va 0) (aref (voxel-hull-m1 hull) 0)))
+                     (:y- (= (aref va 1) split-loc))
+                     (:y+ (= (aref va 1) (aref (voxel-hull-m1 hull) 1)))
+                     (:z- (= (aref va 2) split-loc))
+                     (:z+ (= (aref va 2) (aref (voxel-hull-m1 hull) 2))))
+                   (vector-push-extend v (voxel-hull-surface-voxels hull))
+                   (vector-push-extend v (voxel-hull-interior-voxels hull)))))
+    ;; Copy all intersecting surface voxels
+    (loop for v across (voxel-hull-surface-voxels parent)
+          for va = (voxel-array v)
+          do (when (and (every #'<= (voxel-hull-m1 hull) v)
+                        (every #'<= v (voxel-hull-m2 hull)))
+               (vector-push-extend v (voxel-hull-surface-voxels hull))))
+    (loop for v across (voxel-hull-new-surface-voxels parent)
+          for va = (voxel-array v)
+          do (when (and (every #'<= (voxel-hull-m1 hull) v)
+                        (every #'<= v (voxel-hull-m2 hull)))
+               (vector-push-extend v (voxel-hull-new-surface-voxels hull))))
+    ;; Recompute the bounding box
+    (fill (voxel-hull-m1 hull) #x7FFFFFFF)
+    (fill (voxel-hull-m2 hull) 0)
+    (loop for v across (voxel-hull-surface-voxels hull) do (min-max-voxel-region hull v))
+    (loop for v across (voxel-hull-new-surface-voxels hull) do (min-max-voxel-region hull v))
+    (loop for v across (voxel-hull-interior-voxels hull) do (min-max-voxel-region hull v))
+    ;; Rebuild
+    (build-voxel-mesh hull)
+    (build-raycast-mesh hull)
+    (compute-convex-hull hull)))
+
+(defun make-voxel-hull* (volume params)
+  (let* ((hull (%make-voxel-hull :min (aabb-min volume)
+                                 :max (aabb-max volume)
+                                 :voxels (vector volume)
+                                 :voxel-scale (volume-scale volume)
+                                 :voxel-scale-half (* 0.5 (volume-scale volume))
+                                 :voxel-adjust (v- (aabb-min volume) (* 0.5 (volume-scale volume)))
+                                 :index (incf *voxel-hull-count*)
+                                 :surface-voxels (copy-seq (volume-surface-voxels volume))
+                                 :interior-voxels (copy-seq (volume-interior-voxels volume))
+                                 :m2 (map '(simple-array (unsigned-byte 32) (3)) #'1- (volume-dimensions volume))
+                                 :parameters params)))
+    (build-voxel-mesh hull)
+    (build-raycast-mesh hull)
+    (compute-convex-hull hull)))
+
+(defun min-max-voxel-region (hull v)
+  (map-into (voxel-hull-m1 hull) #'min (voxel-hull-m1 hull) (voxel-array v))
+  (map-into (voxel-hull-m2 hull) #'max (voxel-hull-m2 hull) (voxel-array v))
+  hull)
+
+(defun build-voxel-mesh (hull)
+  (loop for v across (voxel-hull-surface-voxels hull)
+        do (add-voxel-box hull v))
+  (loop for v across (voxel-hull-new-surface-voxels hull)
+        do (add-voxel-box hull v)))
+
+(defun build-raycast-mesh (hull)
+  (when (/= 0 (length (voxel-hull-indices hull)))
+    (setf (voxel-hull-aabb-tree hull) (make-aabb-tree (voxel-hull-vertices hull) (voxel-hull-indices hull))))
+  hull)
+
+(defun compute-convex-hull (hull)
+  (when (/= 0 (length (voxel-hull-vertices hull)))
+    (multiple-value-bind (verts faces) (compute-convex-hull (voxel-hull-vertices hull))
+      ;; TODO: Ech.
+      (setf (voxel-hull-convex-hull hull) (make-convex-hull* verts faces))))
+  (when (voxel-hull-convex-hull hull)
+    (setf (voxel-hull-hull-volume hull) (convex-hull-volume (voxel-hull-convex-hull hull))))
+  (let ((single-voxel-volume (expt (voxel-hull-voxel-scale hull) 3))
+        (voxel-count (+ (length (voxel-hull-interior-voxels hull))
+                        (length (voxel-hull-surface-voxels hull))
+                        (length (voxel-hull-new-surface-voxels hull)))))
+    (setf (voxel-hull-voxel-volume hull) (* voxel-count single-voxel-volume))
+    (setf (voxel-hull-volume-error hull) (/ (* (abs (- (voxel-hull-hull-volume hull) (voxel-hull-voxel-volume hull)))
+                                               100)
+                                            (voxel-hull-voxel-volume hull)))))
+
+(defun voxel-hull-complete-p (hull)
+  (or (null (voxel-hull-convex-hull hull))
+      (< (voxel-hull-volume-error hull)
+         (error-percentage (voxel-hull-parameters hull)))
+      (< (max-recursion-depth (voxel-hull-parameters hull)) (voxel-hull-depth hull))
+      (every (lambda (m2 m1) (<= (- m2 m1) (minimum-edge-length (voxel-hull-parameters hull))))
+             (voxel-hull-m2 hull) (voxel-hull-m1 hull))))
+
+(defun voxel-hull-point (v hull)
+  (let ((scale (voxel-hull-voxel-scale hull))
+        (bmin (voxel-hull-voxel-adjust hull)))
+    (vec (+ (* (voxel-x v) scale) (vx bmin))
+         (+ (* (voxel-y v) scale) (vy bmin))
+         (+ (* (voxel-z v) scale) (vz bmin)))))
+
+(defun voxel-index (hull v)
+  (or (gethash v (voxel-hull-voxel-index-map hull))
+      (let ((p (voxel-hull-point v hull))
+            (i (hash-table-count (voxel-hull-voxel-index-map hull))))
+        (setf (gethash v (voxel-hull-voxel-index-map hull)) i)
+        (vector-push-extend (vx p) (voxel-hull-vertices hull))
+        (vector-push-extend (vy p) (voxel-hull-vertices hull))
+        (vector-push-extend (vz p) (voxel-hull-vertices hull))
+        i)))
+
+(defun add-voxel-box (hull v)
+  (macrolet ((bmin (dim)
+               `(+ 0 (,(intern (format NIL "~a-~a" 'voxel dim)) v)))
+             (bmax (dim)
+               `(+ 1 (,(intern (format NIL "~a-~a" 'voxel dim)) v))))
+    (let ((p0 (vec (bmin x) (bmin y) (bmin z)))
+          (p1 (vec (bmax x) (bmin y) (bmin z)))
+          (p2 (vec (bmax x) (bmax y) (bmin z)))
+          (p3 (vec (bmin x) (bmax y) (bmin z)))
+          (p4 (vec (bmin x) (bmin y) (bmax z)))
+          (p5 (vec (bmax x) (bmin y) (bmax z)))
+          (p6 (vec (bmax x) (bmax y) (bmax z)))
+          (p7 (vec (bmin x) (bmax y) (bmax z))))
+      (add-triangle hull p2 p1 p0)
+      (add-triangle hull p3 p2 p0)
+
+      (add-triangle hull p7 p2 p3)
+      (add-triangle hull p7 p6 p2)
+
+      (add-triangle hull p5 p1 p2)
+      (add-triangle hull p5 p2 p6)
+
+      (add-triangle hull p5 p4 p1)
+      (add-triangle hull p4 p0 p1)
+
+      (add-triangle hull p4 p6 p7)
+      (add-triangle hull p4 p5 p6)
+
+      (add-triangle hull p4 p7 p0)
+      (add-triangle hull p7 p3 p0))))
+
+(defun add-triangle (hull p1 p2 p3)
+  (vector-push-extend (voxel-index hull p1) (voxel-hull-indices hull))
+  (vector-push-extend (voxel-index hull p2) (voxel-hull-indices hull))
+  (vector-push-extend (voxel-index hull p3) (voxel-hull-indices hull)))
+
+(defun compute-split-plane (hull)
+  (let ((d (map 'vector #'- (voxel-hull-m2 hull) (voxel-hull-m1 hull))))
+    (cond ((and (<= (aref d 1) (aref d 0)) (<= (aref d 2) (aref d 0)))
+           (values :x
+                   (/ (+ 1 (aref (voxel-hull-m2 hull) 0) (aref (voxel-hull-m1 hull) 0)) 2)))
+          ((and (<= (aref d 0) (aref d 1)) (<= (aref d 2) (aref d 1)))
+           (values :y
+                   (/ (+ 1 (aref (voxel-hull-m2 hull) 1) (aref (voxel-hull-m1 hull) 1)) 2)))
+          (T
+           (values :z
+                   (/ (+ 1 (aref (voxel-hull-m2 hull) 2) (aref (voxel-hull-m1 hull) 2)) 2))))))
+
+(defun raycast (hull p1 p2)
+  (let* ((from (voxel-hull-point hull p1))
+         (dir (nvunit (v- (voxel-hull-point hull p2) from))))
+    (or (trace-ray (voxel-hull-aabb-tree hull) from dir) 0.0)))
+
+;; Omit find-concavity
+
+(defun perform-plane-split (hull)
+  (unless (voxel-hull-complete-p hull)
+    (multiple-value-bind (axis split-location) (compute-split-plane hull)
+      (ecase axis
+        (:x
+         (setf (voxel-hull-hull-a hull) (make-voxel-hull hull :x- split-location))
+         (setf (voxel-hull-hull-b hull) (make-voxel-hull hull :x+ split-location)))
+        (:y
+         (setf (voxel-hull-hull-a hull) (make-voxel-hull hull :y- split-location))
+         (setf (voxel-hull-hull-b hull) (make-voxel-hull hull :y+ split-location)))
+        (:z
+         (setf (voxel-hull-hull-a hull) (make-voxel-hull hull :z- split-location))
+         (setf (voxel-hull-hull-b hull) (make-voxel-hull hull :z+ split-location))))))
+  hull)
+
+(defun reduce-convex-hull (decomposer ch &key (max-vertices (max-vertices-per-convex-hull (decomposer-parameters decomposer)))
+                                              (shrink-wrap-p (shrink-wrap-p (decomposer-parameters decomposer))))
+  (multiple-value-bind (verts faces) (shrink-wrap (convex-hull-points ch)
+                                                  (decomposer-aabb-tree decomposer)
+                                                  max-vertices (* 4 (decomposer-voxel-scale decomposer))
+                                                  shrink-wrap-p)
+    (make-convex-hull* verts faces)))
+
+(defun compute-concavity (volume-separate volume-combined volume-mesh)
+  (/ (abs (- volume-separate volume-combined)) volume-mesh))
+
+(defun perform-merge-cost-task (decomposer task)
+  (let* ((a (cost-task-a task))
+         (b (cost-task-b task))
+         (va (convex-hull-volume a))
+         (vb (convex-hull-volume b))
+         (combined (combine-convex-hulls a b))
+         (combined-volume (convex-hull-volume combined)))
+    (setf (cost-task-concavity task) (compute-concavity (+ va vb) combined-volume (decomposer-overall-hull-volume decomposer)))))
+
+(defun fast-cost (decomposer task)
+  (let ((a (cost-task-a task))
+        (b (cost-task-b task)))
+    (unless (aabb-intersects-p a b)
+      (let ((concavity (compute-concavity (+ (convex-hull-volume a) (convex-hull-volume a))
+                                          (aabb-volume (aabb-union a b))
+                                          (decomposer-overall-hull-volume decomposer))))
+        (priority-queue:pqueue-push (make-hull-pair a b concavity) concavity
+                                    (decomposer-hull-pair-queue decomposer))))))
+
+(defun add-cost (decomposer task)
+  (priority-queue:pqueue-push (make-hull-pair (cost-task-a task) (cost-task-b task) (cost-task-concavity task))
+                              (cost-task-concavity task)
+                              (decomposer-hull-pair-queue decomposer)))
+
+(defun scale-convex-hull (decomposer hull)
+  (let ((verts (convex-hull-points hull))
+        (faces (convex-hull-triangles hull))
+        (scale (decomposer-scale decomposer))
+        (center (decomposer-center decomposer)))
+    (loop for v from 0 below (length verts) by 3
+          do (setf (aref verts (+ 0 v)) (+ (vx center) (* scale (aref verts (+ 0 v)))))
+             (setf (aref verts (+ 1 v)) (+ (vy center) (* scale (aref verts (+ 1 v)))))
+             (setf (aref verts (+ 2 v)) (+ (vz center) (* scale (aref verts (+ 2 v))))))
+    (setf (convex-hull-volume hull) (convex-volume verts faces))
+    (setf (convex-hull-center hull) (centroid verts faces))
+    hull))
+
+(defun %decompose (decomposer)
+  ;; CopyInputMesh
+  (let* ((bounds (aabb-bounds (decomposer-vertices decomposer)))
+         (center (aabb-center bounds)))
+    (setf (decomposer-center decomposer) center)
+    (setf (decomposer-scale decomposer) (vmaxcoeff (v- (aabb-max bounds) (aabb-min bounds))))
+    (setf (decomposer-recip-scale decomposer) (if (= 0 (decomposer-scale decomposer))
+                                                  0.0
+                                                  (decomposer-scale decomposer))))
+  ;; IMPL:
+  ;; ???? Don't understand this fuckery with VertexIndex and how it relates to a kd-tree
+  ;;
+  (setf (decomposer-aabb-tree decomposer) (make-aabb-tree (decomposer-vertices decomposer)
+                                                          (decomposer-indices decomposer)))
+  (setf (decomposer-voxelize decomposer) (make-volume (decomposer-vertices decomposer)
+                                                      (decomposer-indices decomposer)
+                                                      (resolution (decomposer-parameters decomposer))))
+  (setf (decomposer-voxel-scale decomposer) (volume-scale (decomposer-voxelize decomposer)))
+  (setf (decomposer-voxel-half-scale decomposer) (* 0.5 (decomposer-voxel-scale decomposer)))
+  (setf (decomposer-voxel-bmin decomposer) (aabb-min (decomposer-voxelize decomposer)))
+  (setf (decomposer-voxel-bmax decomposer) (aabb-max (decomposer-voxelize decomposer)))
+  (let ((vh (make-voxel-hull* (decomposer-voxelize decomposer) (decomposer-parameters decomposer))))
+    (when (voxel-hull-convex-hull vh)
+      (setf (decomposer-overall-hull-volume decomposer)
+            (convex-hull-volume (voxel-hull-convex-hull vh))))
+    (vector-push-extend vh (decomposer-pending-hulls decomposer)))
+  ;; Decompose
+  )
+
+(defun make-decomposer (verts faces &rest args)
+  (%make-decomposer verts faces (apply #'make-ch-parameters args)))
+
+(defun decompose (verts faces &rest args &key convex-hulls
+                                              resolution
+                                              error-percentage
+                                              max-recursion-depth
+                                              shrink-wrap-p
+                                              max-vertices-per-convex-hull
+                                              minimum-edge-length)
+  (declare (ignore convex-hulls resolution error-percentage max-recursion-depth
+                   shrink-wrap-p max-vertices-per-convex-hull minimum-edge-length))
+  (let ((decomposer (apply #'make-decomposer verts faces args)))
+    (%decompose decomposer)
+    (decomposer-hulls decomposer)))
