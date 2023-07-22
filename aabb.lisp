@@ -7,6 +7,10 @@
   (min (vec 0 0 0) :type vec3)
   (max (vec 0 0 0) :type vec3))
 
+(defmethod print-object ((aabb aabb) stream)
+  (print-unreadable-object (aabb stream :type T)
+    (format stream "~a ~a" (aabb-min aabb) (aabb-max aabb))))
+
 (defun copy-aabb (a)
   (make-aabb (vcopy (aabb-min a)) (vcopy (aabb-max a))))
 

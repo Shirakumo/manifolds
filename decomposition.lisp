@@ -30,19 +30,19 @@
 
 (defmethod print-object ((node aabb-node) stream)
   (print-unreadable-object (node stream :type T)
+    (format stream "~a ~a " (aabb-min node) (aabb-max node))
     (if (= 0 (length (aabb-node-faces node)))
         (format stream "INTERIOR")
         (format stream "LEAF"))))
 
 (defstruct (aabb-tree
-            (:constructor %make-aabb-tree (vertices indices faces face-bounds))
+            (:constructor %make-aabb-tree (vertices indices faces))
             (:copier NIL)
             (:predicate NIL))
   (vertices NIL :type (simple-array single-float (*)))
   (indices NIL :type (simple-array (unsigned-byte 32) (*)))
   (nodes (make-array 0 :adjustable T :fill-pointer T) :type vector)
   (faces NIL :type (simple-array (unsigned-byte 32) (*)))
-  (face-bounds NIL :type (simple-array T (*)))
   (depth 0 :type (unsigned-byte 32))
   (inner-nodes 0 :type (unsigned-byte 32))
   (leaf-nodes 0 :type (unsigned-byte 32)))
@@ -64,6 +64,7 @@
 
 (defmethod print-object ((hull convex-hull) stream)
   (print-unreadable-object (hull stream :type T)
+    (format stream "~a ~a " (aabb-min hull) (aabb-max hull))
     (format stream "~d verts ~d faces ~f volume"
             (length (convex-hull-vertices hull))
             (length (convex-hull-faces hull))
@@ -116,6 +117,7 @@
 
 (defmethod print-object ((volume volume) stream)
   (print-unreadable-object (volume stream :type T)
+    (format stream "~a ~a " (aabb-min volume) (aabb-max volume))
     (format stream "~a ~d on surface ~d inside ~d outside"
             (volume-dimensions volume)
             (volume-voxels-on-surface volume)
@@ -153,6 +155,7 @@
 
 (defmethod print-object ((hull voxel-hull) stream)
   (print-unreadable-object (hull stream :type T)
+    (format stream "~a ~a " (aabb-min hull) (aabb-max hull))
     (format stream "~a at ~d, ~d hulls"
             (voxel-hull-axis hull)
             (voxel-hull-depth hull)
@@ -357,14 +360,11 @@
   (let* ((max-faces-per-leaf 6)
          (num-faces (truncate (length indices) 3))
          (faces (make-array num-faces :element-type '(unsigned-byte 32)))
-         (face-bounds (make-array num-faces :element-type T :initial-element NIL))
-         (tree (%make-aabb-tree vertices indices faces face-bounds))
+         (tree (%make-aabb-tree vertices indices faces))
          (nodes (aabb-tree-nodes tree))
          (depth 0))
     (dotimes (i num-faces)
-      (let ((top (calculate-face-bounds tree i 1)))
-        (setf (aref faces i) i)
-        (setf (aref face-bounds i) top)))
+      (setf (aref faces i) i))
     (labels ((rec (node start end)
                (let ((num-faces (- end start)))
                  (incf depth)
@@ -958,10 +958,14 @@
     (setf (decomposer-recip-scale decomposer) (if (= 0 (decomposer-scale decomposer))
                                                   0.0
                                                   (decomposer-scale decomposer)))
+    (dbg "Normalizing mesh")
     (multiple-value-bind (vertices indices) (normalize vertices indices :center center :scale (decomposer-scale decomposer))
+      (dbg "Computing aabb tree")
       (setf (decomposer-aabb-tree decomposer) (make-aabb-tree vertices indices))
+      (dbg "Computing initial voxel volume")
       (setf (decomposer-voxelize decomposer) (make-volume vertices indices (decomposer-resolution decomposer)))
       (setf (decomposer-voxel-scale decomposer) (volume-scale (decomposer-voxelize decomposer))))
+    (dbg "Voxelizing volume")
     (let ((vh (make-voxel-hull* (decomposer-voxelize decomposer) decomposer)))
       (when (voxel-hull-convex-hull vh)
         (setf (decomposer-overall-hull-volume decomposer)
@@ -983,15 +987,13 @@
                                    (vector-push-extend (voxel-hull-a hull) pending))
                                  (when (voxel-hull-b hull)
                                    (vector-push-extend (voxel-hull-b hull) pending))))))))
-    ;; Build the hull ID map
+    ;; Build the convex hulls from the voxel hulls
     (loop for hull across voxel-hulls
-          ;; ?? it does a copy here, but why?
-          for ch = (voxel-hull-convex-hull hull)
-          for id = (length hulls)
-          do (vector-push-extend ch hulls))
+          do (vector-push-extend (voxel-hull-convex-hull hull) hulls))
     ;; Merge convex hulls down as much as needed
     (let ((hull-count (length hulls)))
       (when (< (decomposer-convex-hulls decomposer) hull-count)
+        (dbg "Merging convex hulls")
         (let ((tasks (make-array 0 :adjustable T :fill-pointer T)))
           ;; Compute the costs and init our priority queue
           (loop for i from 1 below hull-count
@@ -1023,6 +1025,7 @@
                        (loop for task across tasks
                              do (add-cost decomposer task))))))))
     ;; Finalize by reducing hulls if necessary and scaling them
+    (dbg "Reducing hulls")
     (loop for i from 0 below (length hulls)
           for hull = (aref hulls i)
           do (when (or (< (decomposer-max-vertices-per-convex-hull decomposer)
