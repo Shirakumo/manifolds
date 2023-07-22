@@ -25,8 +25,14 @@
             (:constructor make-aabb-node)
             (:copier NIL)
             (:predicate NIL))
-  (children (make-array 2 :element-type '(unsigned-byte 32)) :type (simple-array (unsigned-byte 32) (2)))
+  (children (make-array 2 :initial-element NIL) :type (simple-array T (2)))
   (faces (make-array 0 :element-type '(unsigned-byte 32)) :type (simple-array (unsigned-byte 32) (*))))
+
+(defmethod print-object ((node aabb-node) stream)
+  (print-unreadable-object (node stream :type T)
+    (if (= 0 (length (aabb-node-faces node)))
+        (format stream "INTERIOR")
+        (format stream "LEAF"))))
 
 (defstruct (aabb-tree
             (:constructor %make-aabb-tree (vertices indices faces face-bounds))
@@ -41,6 +47,11 @@
   (inner-nodes 0 :type (unsigned-byte 32))
   (leaf-nodes 0 :type (unsigned-byte 32)))
 
+(defmethod print-object ((tree aabb-tree) stream)
+  (print-unreadable-object (tree stream :type T)
+    (format stream "depth ~d, ~d inner ~d leaf nodes"
+            (aabb-tree-depth tree) (aabb-tree-inner-nodes tree) (aabb-tree-leaf-nodes tree))))
+
 (defstruct (convex-hull
             (:constructor %make-convex-hull)
             (:include aabb)
@@ -51,12 +62,24 @@
   (volume 0.0 :type single-float)
   (center (vec 0 0 0) :type vec3))
 
+(defmethod print-object ((hull convex-hull) stream)
+  (print-unreadable-object (hull stream :type T)
+    (format stream "~d verts ~d faces ~f volume"
+            (length (convex-hull-vertices hull))
+            (length (convex-hull-faces hull))
+            (convex-hull-volume hull))))
+
 (defstruct (vertex-index
             (:include vec3)
             (:constructor make-vertex-index (3d-vectors::%vx3 3d-vectors::%vy3 3d-vectors::%vz3 index))
             (:copier NIL)
             (:predicate NIL))
   (index 0 :type (unsigned-byte 32)))
+
+(defmethod print-object ((index vertex-index) stream)
+  (print-unreadable-object (index stream :type T)
+    (format stream "~d ~f ~f ~f"
+            (vertex-index-index index) (vx index) (vy index) (vz index))))
 
 (defmethod org.shirakumo.fraf.trial.space:location ((v vertex-index)) v)
 (defmethod org.shirakumo.fraf.trial.space:bsize ((v vertex-index)) #.(vec 0 0 0))
@@ -91,6 +114,14 @@
   (surface-voxels (make-array 0 :element-type 'voxel :adjustable T :fill-pointer T) :type (vector voxel))
   (interior-voxels (make-array 0 :element-type 'voxel :adjustable T :fill-pointer T) :type (vector voxel)))
 
+(defmethod print-object ((volume volume) stream)
+  (print-unreadable-object (volume stream :type T)
+    (format stream "~a ~d on surface ~d inside ~d outside"
+            (volume-dimensions volume)
+            (volume-voxels-on-surface volume)
+            (volume-voxels-inside-surface volume)
+            (volume-voxels-outside-surface volume))))
+
 (defstruct (voxel-hull
             (:include aabb)
             (:constructor %make-voxel-hull)
@@ -119,6 +150,13 @@
   (indices (make-array 0 :element-type '(unsigned-byte 32) :adjustable T :fill-pointer T) :type (vector (unsigned-byte 32)))
   (voxel-hull-count 0 :type (unsigned-byte 32))
   (decomposer NIL :type T))
+
+(defmethod print-object ((hull voxel-hull) stream)
+  (print-unreadable-object (hull stream :type T)
+    (format stream "~a at ~d, ~d hulls"
+            (voxel-hull-axis hull)
+            (voxel-hull-depth hull)
+            (voxel-hull-voxel-hull-count hull))))
 
 (defstruct (cost-task
             (:constructor make-cost-task (a b))
@@ -156,6 +194,9 @@
   (shrink-wrap-p T :type boolean)
   (max-vertices-per-convex-hull 64 :type (unsigned-byte 32))
   (minimum-edge-length 2 :type (unsigned-byte 32)))
+
+(defmethod print-object ((decomposer decomposer) stream)
+  (print-unreadable-object (decomposer stream :type T)))
 
 ;;;; Additional ops
 (defun vmaxcoeff (a)
@@ -314,9 +355,9 @@
 
 (defun make-aabb-tree (vertices indices)
   (let* ((max-faces-per-leaf 6)
-         (num-faces (length indices))
+         (num-faces (truncate (length indices) 3))
          (faces (make-array num-faces :element-type '(unsigned-byte 32)))
-         (face-bounds (make-array num-faces :element-type T))
+         (face-bounds (make-array num-faces :element-type T :initial-element NIL))
          (tree (%make-aabb-tree vertices indices faces face-bounds))
          (nodes (aabb-tree-nodes tree))
          (depth 0))
@@ -334,7 +375,7 @@
                         (incf (aabb-tree-leaf-nodes tree)))
                        (T
                         (incf (aabb-tree-inner-nodes tree))
-                        (let ((left-count (partition-median tree faces start end))
+                        (let ((left-count (partition-median tree node faces start end))
                               (i0 (make-aabb-node))
                               (i1 (make-aabb-node)))
                           (replace (aabb-node-children node) (list i0 i1))
@@ -353,7 +394,7 @@
     (labels ((rec (node)
                (cond ((= 0 (length (aabb-node-faces node)))
                       (let* ((left (aref (aabb-node-children node) 0))
-                             (right (aref (aabb-node-children node) 0))
+                             (right (aref (aabb-node-children node) 1))
                              (dist-l (aabb-ray left start dir))
                              (dist-r (aabb-ray right start dir)))
                         (when (< dist-r dist-l)
@@ -385,7 +426,7 @@
     (labels ((rec (node)
                (cond ((= 0 (length (aabb-node-faces node)))
                       (let* ((left (aref (aabb-node-children node) 0))
-                             (right (aref (aabb-node-children node) 0))
+                             (right (aref (aabb-node-children node) 1))
                              (lp (aabb-closest-point left point))
                              (rp (aabb-closest-point right point))
                              (dist-l (vsqrdistance point lp))
@@ -419,21 +460,19 @@
            (setf (aabb-min aabb) (vmin (aabb-min aabb) p))
            (setf (aabb-max aabb) (vmax (aabb-max aabb) p))))
     (loop for face from start below end
-          for base-vertex = (* 3 (aref (aabb-tree-indices tree) face))
-          do (update (v (aabb-tree-vertices tree) (+ base-vertex 0)))
-             (update (v (aabb-tree-vertices tree) (+ base-vertex 1)))
-             (update (v (aabb-tree-vertices tree) (+ base-vertex 2))))
+          for index = (aref (aabb-tree-indices tree) face)
+          do (update (v (aabb-tree-vertices tree) index)))
     aabb))
 
-(defun partition-median (tree faces start end)
-  (let ((axis (aabb-longest-axis tree))
+(defun partition-median (tree node faces start end)
+  (let ((axis (aabb-longest-axis node))
         (verts (aabb-tree-vertices tree))
         (indices (aabb-tree-indices tree)))
     (labels ((centroid (face)
-               (let* ((base-vertex (* 3 (aref indices face)))
-                      (a (aref verts (+ axis (* 3 (+ base-vertex 0)))))
-                      (b (aref verts (+ axis (* 3 (+ base-vertex 1)))))
-                      (c (aref verts (+ axis (* 3 (+ base-vertex 2))))))
+               (let* ((index (* 3 face))
+                      (a (aref verts (+ axis (* 3 (aref indices (+ 0 index))))))
+                      (b (aref verts (+ axis (* 3 (aref indices (+ 1 index))))))
+                      (c (aref verts (+ axis (* 3 (aref indices (+ 2 index)))))))
                  (/ (+ a b c) 3.0)))
              (compare (lhs rhs)
                (let ((a (centroid lhs))
@@ -827,10 +866,11 @@
 
 (defun reduce-convex-hull (decomposer ch &key (max-vertices (decomposer-max-vertices-per-convex-hull decomposer))
                                               (shrink-wrap-p (decomposer-shrink-wrap-p decomposer)))
-  (multiple-value-bind (verts faces) (shrink-wrap (convex-hull-vertices ch)
-                                                  (decomposer-aabb-tree decomposer)
-                                                  max-vertices (* 4 (decomposer-voxel-scale decomposer))
-                                                  shrink-wrap-p)
+  (multiple-value-bind (verts faces)
+      (shrink-wrap (convex-hull-vertices ch)
+                   (decomposer-aabb-tree decomposer)
+                   max-vertices (* 4 (decomposer-voxel-scale decomposer))
+                   shrink-wrap-p)
     (make-convex-hull verts faces)))
 
 (defun compute-concavity (volume-separate volume-combined volume-mesh)
@@ -948,8 +988,7 @@
           ;; ?? it does a copy here, but why?
           for ch = (voxel-hull-convex-hull hull)
           for id = (length hulls)
-          do (setf (convex-hull-id ch) id)
-             (vector-push-extend ch hulls))
+          do (vector-push-extend ch hulls))
     ;; Merge convex hulls down as much as needed
     (let ((hull-count (length hulls)))
       (when (< (decomposer-convex-hulls decomposer) hull-count)
@@ -974,7 +1013,6 @@
                    (when (and ch-a ch-b)
                      (let ((combined (combine-convex-hulls ch-a ch-b))
                            (tasks (make-array 0 :adjustable T :fill-pointer T)))
-                       (setf (convex-hull-id combined) (length hulls))
                        (loop for hull across hulls
                              for task = (make-cost-task combined hull)
                              do (unless (fast-cost decomposer task)
