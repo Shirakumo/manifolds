@@ -10,6 +10,7 @@
   :serial T
   :components ((:file "package")
                (:file "manifolds")
+               (:file "aabb")
                (:file "convert")
                (:file "decomposition"))
   :depends-on (:3d-vectors

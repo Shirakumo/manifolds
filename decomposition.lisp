@@ -20,79 +20,6 @@
 (in-package #:org.shirakumo.fraf.manifolds)
 
 ;;;; Support structures
-(defstruct (aabb
-            (:constructor make-aabb (&optional min max))
-            (:copier NIL)
-            (:predicate NIL))
-  (min (vec 0 0 0) :type vec3)
-  (max (vec 0 0 0) :type vec3))
-
-(defun copy-aabb (a)
-  (make-aabb (vcopy (aabb-min a)) (vcopy (aabb-max a))))
-
-(defun aabb-union (a b)
-  (make-aabb (vmin (aabb-min a) (aabb-min b))
-             (vmax (aabb-max a) (aabb-max b))))
-
-(defun aabb-intersects-p (a b)
-  (and (not (or (< (vx3 (aabb-max b)) (vx3 (aabb-min a)))
-                (< (vx3 (aabb-max a)) (vx3 (aabb-min b)))))
-       (not (or (< (vy3 (aabb-max b)) (vy3 (aabb-min a)))
-                (< (vy3 (aabb-max a)) (vy3 (aabb-min b)))))
-       (not (or (< (vz3 (aabb-max b)) (vz3 (aabb-min a)))
-                (< (vz3 (aabb-max a)) (vz3 (aabb-min b)))))))
-
-(defun aabb-surface-area (a)
-  (let ((dx (- (vx3 (aabb-max a)) (vx3 (aabb-min a))))
-        (dy (- (vy3 (aabb-max a)) (vy3 (aabb-min a))))
-        (dz (- (vz3 (aabb-max a)) (vz3 (aabb-min a)))))
-    (* 2.0 (+ (* dx dy) (* dx dz) (* dy dz)))))
-
-(defun aabb-volume (a)
-  (let ((dx (- (vx3 (aabb-max a)) (vx3 (aabb-min a))))
-        (dy (- (vy3 (aabb-max a)) (vy3 (aabb-min a))))
-        (dz (- (vz3 (aabb-max a)) (vz3 (aabb-min a)))))
-    (* dx dy dz)))
-
-(defun aabb-inflate (a ratio)
-  (let ((inflate (* (v2norm (v- (aabb-min a) (aabb-max a))) 0.5 ratio)))
-    (make-aabb (v- (aabb-min a) inflate) (v+ (aabb-max a) inflate))))
-
-(defun aabb-size (a)
-  (v- (aabb-max a) (aabb-min a)))
-
-(defun aabb-center (a)
-  (nv* (v+ (aabb-max a) (aabb-min a)) 0.5))
-
-(defun aabb-closest-point (a p)
-  (vmin (vmax p (aabb-min a)) (aabb-max a)))
-
-(defun aabb-longest-axis (a)
-  (let ((x (- (vx (aabb-max a)) (vx (aabb-min a))))
-        (y (- (vy (aabb-max a)) (vy (aabb-min a))))
-        (z (- (vz (aabb-max a)) (vz (aabb-min a)))))
-    (if (< x y)
-        (if (< y z) 2 1)
-        (if (< x z) 2 0))))
-
-(defun aabb-bounds (vertices &optional (aabb (make-aabb)))
-  (let ((min (aabb-min aabb))
-        (max (aabb-max aabb)))
-    (setf (vx min) (setf (vx max) (aref vertices 0)))
-    (setf (vy min) (setf (vy max) (aref vertices 1)))
-    (setf (vz min) (setf (vz max) (aref vertices 2)))
-    (loop for i from 3 below (length vertices) by 3
-          for x = (aref vertices (+ i 0))
-          for y = (aref vertices (+ i 1))
-          for z = (aref vertices (+ i 2))
-          do (setf (vx min) (min (vx min) x))
-             (setf (vy min) (min (vy min) y))
-             (setf (vz min) (min (vz min) z))
-             (setf (vx max) (max (vx max) x))
-             (setf (vy max) (max (vy max) y))
-             (setf (vz max) (max (vz max) z)))
-    aabb))
-
 (defstruct (aabb-node
             (:include aabb)
             (:constructor make-aabb-node)
@@ -123,36 +50,6 @@
   (faces (make-array 0 :adjustable T :fill-pointer T) :type vector)
   (volume 0.0 :type single-float)
   (center (vec 0 0 0) :type vec3))
-
-(defstruct (ch-parameters
-            (:copier NIL)
-            (:predicate NIL)
-            (:conc-name NIL))
-  (convex-hulls 64 :type (unsigned-byte 32))
-  (resolution 400000 :type (unsigned-byte 32))
-  (error-percentage 1.0 :type single-float)
-  (max-recursion-depth 10 :type (unsigned-byte 32))
-  (shrink-wrap-p T :type boolean)
-  (max-vertices-per-convex-hull 64 :type (unsigned-byte 32))
-  (minimum-edge-length 2 :type (unsigned-byte 32)))
-
-;;; Skip Googol implementation
-;;; Skip kd-tree implementation
-;;; Skip Quickhull implementation
-
-(defstruct (plane
-            (:include vec3)
-            (:constructor plane (&optional 3d-vectors::%vx3 3d-vectors::%vy3 3d-vectors::%vz3 offset))
-            (:copier NIL)
-            (:predicate NIL))
-  (offset 0.0 :type single-float))
-
-(defun evaluate-plane (plane p)
-  (+ (plane-offset plane) (v. plane p)))
-
-(defun make-plane (p0 p1 p2)
-  (let ((v (vc (v- p1 p0) (v- p2 p0))))
-    (plane (vx3 v) (vy3 v) (vz3 v) (- (v. p0 p0)))))
 
 (defstruct (vertex-index
             (:include vec3)
@@ -218,7 +115,7 @@
   (vertices (make-array 0 :element-type 'single-float :adjustable T :fill-pointer T) :type (vector single-float))
   (indices (make-array 0 :element-type '(unsigned-byte 32) :adjustable T :fill-pointer T) :type (vector (unsigned-byte 32)))
   (voxel-hull-count 0 :type (unsigned-byte 32))
-  (parameters NIL :type ch-parameters))
+  (decomposer NIL :type T))
 
 (defstruct (cost-task
             (:constructor make-cost-task (a b))
@@ -237,7 +134,7 @@
   (concavity 0.0 :type single-float))
 
 (defstruct (decomposer
-            (:constructor %make-decomposer (parameters))
+            (:constructor make-decomposer)
             (:copier NIL)
             (:predicate NIL))
   (aabb-tree NIL :type (or null aabb-tree))
@@ -247,27 +144,17 @@
   (recip-scale 1.0 :type single-float)
   (overall-hull-volume 0.0 :type single-float)
   (voxel-scale 0.0 :type single-float)
-  (parameters NIL :type ch-parameters)
-  (hull-pair-queue (priority-queue:make-pqueue #'<= :key-type 'single-float) :type priority-queue::pqueue))
+  (hull-pair-queue (priority-queue:make-pqueue #'<= :key-type 'single-float) :type priority-queue::pqueue)
+  ;; Parameters
+  (convex-hulls 64 :type (unsigned-byte 32))
+  (resolution 400000 :type (unsigned-byte 32))
+  (error-percentage 1.0 :type single-float)
+  (max-recursion-depth 10 :type (unsigned-byte 32))
+  (shrink-wrap-p T :type boolean)
+  (max-vertices-per-convex-hull 64 :type (unsigned-byte 32))
+  (minimum-edge-length 2 :type (unsigned-byte 32)))
 
 ;;;; Additional ops
-;;; They implement strange comparators.
-(defun v<* (a b)
-  (cond ((/= (vx3 a) (vx3 b))
-         (< (vx3 a) (vx3 b)))
-        ((/= (vy3 a) (vy3 b))
-         (< (vy3 a) (vy3 b)))
-        (T
-         (< (vz3 a) (vz3 b)))))
-
-(defun v>* (a b)
-  (cond ((/= (vx3 a) (vx3 b))
-         (< (vx3 a) (vx3 b)))
-        ((/= (vy3 a) (vy3 b))
-         (< (vy3 a) (vy3 b)))
-        (T
-         (< (vz3 a) (vz3 b)))))
-
 (defun vmaxcoeff (a)
   (let ((x (vx3 a)) (y (vy3 a)) (z (vz3 a)))
     (if (< x y)
@@ -277,18 +164,6 @@
         (if (< x z)
             (values z :z)
             (values x :x)))))
-
-(defun tetrahedrum-volume (p0 p1 p2 p3)
-  (v. (v- p3 p0) (vc (v- p1 p0) (v- p2 p0))))
-
-(defun bit-reversal (v base)
-  (let ((x 0)
-        (power (truncate (log base 2))))
-    (loop do (incf x (ash (logand v 1) power))
-             (setf v (ash v -1))
-             (decf power)
-          while (/= 0 v))
-    x))
 
 (defun aabb-ray (aabb start dir)
   (let ((inside-p T)
@@ -761,7 +636,7 @@
                                  :depth (1+ (voxel-hull-depth parent))
                                  :m1 (voxel-hull-m1 parent)
                                  :m2 (voxel-hull-m2 parent)
-                                 :parameters (voxel-hull-parameters parent))))
+                                 :decomposer (voxel-hull-decomposer parent))))
     (case axis
       (:x- (setf (vx (voxel-hull-m2 hull)) split-loc))
       (:x+ (setf (vx (voxel-hull-m1 hull)) (1+ split-loc)))
@@ -805,7 +680,7 @@
     (build-raycast-mesh hull)
     (compute-convex-hull hull)))
 
-(defun make-voxel-hull* (volume params)
+(defun make-voxel-hull* (volume decomposer)
   (let* ((hull (%make-voxel-hull :min (aabb-min volume)
                                  :max (aabb-max volume)
                                  :voxels (vector volume)
@@ -815,7 +690,7 @@
                                  :surface-voxels (copy-seq (volume-surface-voxels volume))
                                  :interior-voxels (copy-seq (volume-interior-voxels volume))
                                  :m2 (map '(simple-array (unsigned-byte 32) (3)) #'1- (volume-dimensions volume))
-                                 :parameters params)))
+                                 :decomposer decomposer)))
     (build-voxel-mesh hull)
     (build-raycast-mesh hull)
     (compute-convex-hull hull)))
@@ -854,9 +729,9 @@
 (defun voxel-hull-complete-p (hull)
   (or (null (voxel-hull-convex-hull hull))
       (< (voxel-hull-volume-error hull)
-         (error-percentage (voxel-hull-parameters hull)))
-      (< (max-recursion-depth (voxel-hull-parameters hull)) (voxel-hull-depth hull))
-      (every (lambda (m2 m1) (<= (- m2 m1) (minimum-edge-length (voxel-hull-parameters hull))))
+         (decomposer-error-percentage (voxel-hull-decomposer hull)))
+      (< (decomposer-max-recursion-depth (voxel-hull-decomposer hull)) (voxel-hull-depth hull))
+      (every (lambda (m2 m1) (<= (- m2 m1) (decomposer-minimum-edge-length (voxel-hull-decomposer hull))))
              (voxel-hull-m2 hull) (voxel-hull-m1 hull))))
 
 (defun voxel-hull-point (v hull)
@@ -946,8 +821,8 @@
          (setf (voxel-hull-b hull) (make-voxel-hull hull :z+ split-location))))))
   hull)
 
-(defun reduce-convex-hull (decomposer ch &key (max-vertices (max-vertices-per-convex-hull (decomposer-parameters decomposer)))
-                                              (shrink-wrap-p (shrink-wrap-p (decomposer-parameters decomposer))))
+(defun reduce-convex-hull (decomposer ch &key (max-vertices (decomposer-max-vertices-per-convex-hull decomposer))
+                                              (shrink-wrap-p (decomposer-shrink-wrap-p decomposer)))
   (multiple-value-bind (verts faces) (shrink-wrap (convex-hull-vertices ch)
                                                   (decomposer-aabb-tree decomposer)
                                                   max-vertices (* 4 (decomposer-voxel-scale decomposer))
@@ -994,14 +869,14 @@
     (setf (convex-hull-center hull) (centroid verts faces))
     hull))
 
-(defun normalize (decomposer vertices indices)
-  (let ((tree)
+(defun normalize (vertices indices &key (threshold 0.001) (center (vec 0 0 0)) (scale 1.0))
+  ;; TODO: could probably do this inline by going over verts first, then faces and only copying once.
+  (let ((tree (org.shirakumo.fraf.trial.space.kd-tree:make-kd-tree))
         (new-vertices (make-array 0 :element-type 'single-float :adjustable T :fill-pointer T))
         (new-indices (make-array 0 :element-type '(unsigned-byte 32) :adjustable T :fill-pointer T)))
     (flet ((vertex-idx (p)
-             (let* ((p (nv* (nv- p (decomposer-center decomposer))
-                            (decomposer-recip-scale decomposer)))
-                    (nearest (org.shirakumo.fraf.trial.space.kd-tree:kd-tree-nearest p tree :max-radius 0.001)))
+             (let* ((p (nv* (nv- p center) scale))
+                    (nearest (org.shirakumo.fraf.trial.space.kd-tree:kd-tree-nearest p tree :max-radius threshold)))
                (cond (nearest
                       (vertex-index-index nearest))
                      (T
@@ -1028,8 +903,7 @@
 
 (defun %decompose (decomposer vertices indices)
   ;; Prepare the necessary data
-  (let* ((params (decomposer-parameters decomposer))
-         (pending (make-array 0 :adjustable T :fill-pointer T))
+  (let* ((pending (make-array 0 :adjustable T :fill-pointer T))
          (voxel-hulls (make-array 0 :adjustable T :fill-pointer T))
          (hulls (make-array 0 :adjustable T :fill-pointer T))
          (max-convex-hull-fragments 100000)
@@ -1040,11 +914,11 @@
     (setf (decomposer-recip-scale decomposer) (if (= 0 (decomposer-scale decomposer))
                                                   0.0
                                                   (decomposer-scale decomposer)))
-    (multiple-value-bind (vertices indices) (normalize decomposer vertices indices)
+    (multiple-value-bind (vertices indices) (normalize vertices indices :center center :scale (decomposer-scale decomposer))
       (setf (decomposer-aabb-tree decomposer) (make-aabb-tree vertices indices))
-      (setf (decomposer-voxelize decomposer) (make-volume vertices indices (resolution params)))
+      (setf (decomposer-voxelize decomposer) (make-volume vertices indices (decomposer-resolution decomposer)))
       (setf (decomposer-voxel-scale decomposer) (volume-scale (decomposer-voxelize decomposer))))
-    (let ((vh (make-voxel-hull* (decomposer-voxelize decomposer) params)))
+    (let ((vh (make-voxel-hull* (decomposer-voxelize decomposer) decomposer)))
       (when (voxel-hull-convex-hull vh)
         (setf (decomposer-overall-hull-volume decomposer)
               (convex-hull-volume (voxel-hull-convex-hull vh))))
@@ -1074,7 +948,7 @@
              (vector-push-extend ch hulls))
     ;; Merge convex hulls down as much as needed
     (let ((hull-count (length hulls)))
-      (when (< (convex-hulls params) hull-count)
+      (when (< (decomposer-convex-hulls decomposer) hull-count)
         (let ((tasks (make-array 0 :adjustable T :fill-pointer T)))
           ;; Compute the costs and init our priority queue
           (loop for i from 1 below hull-count
@@ -1089,7 +963,7 @@
                    (add-cost decomposer task)))
         ;; Actually merge convex hulls now
         (loop until (or (priority-queue:pqueue-empty-p (decomposer-hull-pair-queue decomposer))
-                        (<= (convex-hulls params) (length hulls)))
+                        (<= (decomposer-convex-hulls decomposer) (length hulls)))
               do (let* ((pair (priority-queue:pqueue-pop (decomposer-hull-pair-queue decomposer)))
                         (ch-a (hull-pair-a pair))
                         (ch-b (hull-pair-b pair)))
@@ -1109,15 +983,12 @@
     ;; Finalize by reducing hulls if necessary and scaling them
     (loop for i from 0 below (length hulls)
           for hull = (aref hulls i)
-          do (when (or (< (max-vertices-per-convex-hull params)
+          do (when (or (< (decomposer-max-vertices-per-convex-hull decomposer)
                           (truncate (length (convex-hull-vertices hull)) 3))
-                       (shrink-wrap-p params))
+                       (decomposer-shrink-wrap-p decomposer))
                (setf (aref hulls i) (setf hull (reduce-convex-hull decomposer hull))))
              (scale-convex-hull decomposer hull))
     hulls))
-
-(defun make-decomposer (verts faces &rest args)
-  (%make-decomposer (apply #'make-ch-parameters args)))
 
 (defun decompose (verts faces &rest args &key convex-hulls
                                               resolution
@@ -1128,4 +999,4 @@
                                               minimum-edge-length)
   (declare (ignore convex-hulls resolution error-percentage max-recursion-depth
                    shrink-wrap-p max-vertices-per-convex-hull minimum-edge-length))
-  (%decompose (apply #'make-decomposer verts faces args) verts faces))
+  (%decompose (apply #'make-decomposer args) verts faces))
