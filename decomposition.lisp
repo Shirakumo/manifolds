@@ -58,6 +58,9 @@
             (:predicate NIL))
   (index 0 :type (unsigned-byte 32)))
 
+(defmethod org.shirakumo.fraf.trial.space:location ((v vertex-index)) v)
+(defmethod org.shirakumo.fraf.trial.space:bsize ((v vertex-index)) #.(vec 0 0 0))
+
 (deftype voxel () '(unsigned-byte 32))
 
 (defun make-voxel (x y z)
@@ -340,7 +343,8 @@
                           (rec i0 start (+ start left-count))
                           (rec i1 (+ start left-count) end))))
                  (decf depth))))
-      (rec 0 0 num-faces))
+      (vector-push-extend (make-aabb-node) nodes)
+      (rec (aref nodes 0) 0 num-faces))
     tree))
 
 (defun trace-ray (tree start dir)
