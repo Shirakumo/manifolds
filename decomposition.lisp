@@ -39,10 +39,10 @@
             (:constructor %make-aabb-tree (vertices indices faces))
             (:copier NIL)
             (:predicate NIL))
-  (vertices NIL :type (array single-float (*)))
-  (indices NIL :type (array (unsigned-byte 32) (*)))
-  (faces NIL :type (array (unsigned-byte 32) (*)))
-  (nodes (make-array 0 :adjustable T :fill-pointer T) :type vector)
+  (vertices NIL :type (simple-array single-float (*)))
+  (indices NIL :type (simple-array (unsigned-byte 32) (*)))
+  (faces NIL :type (simple-array (unsigned-byte 32) (*)))
+  (nodes (make-array 0 :adjustable T :fill-pointer T) :type (array T (*)))
   (depth 0 :type (unsigned-byte 32))
   (inner-nodes 0 :type (unsigned-byte 32))
   (leaf-nodes 0 :type (unsigned-byte 32)))
@@ -57,8 +57,8 @@
             (:include aabb)
             (:copier NIL)
             (:predicate NIL))
-  (vertices (make-array 0 :adjustable T :fill-pointer T) :type vector)
-  (faces (make-array 0 :adjustable T :fill-pointer T) :type vector)
+  (vertices (make-array 0 :element-type 'single-float) :type (simple-array single-float (*)))
+  (faces (make-array 0 :element-type '(unsigned-byte 32)) :type (simple-array (unsigned-byte 32) (*)))
   (volume 0.0 :type single-float)
   (center (vec 0 0 0) :type vec3))
 
@@ -132,7 +132,6 @@
   (axis :x- :type (member :x- :x+ :y- :y+ :z- :z+))
   (voxels (make-array 0 :adjustable T :fill-pointer T) :type vector)
   (voxel-scale 0.0 :type single-float)
-  (voxel-scale-half 0.0 :type single-float)
   (voxel-adjust (vec 0 0 0) :type vec3)
   (depth 0 :type (unsigned-byte 32))
   (volume-error 0.0 :type single-float)
@@ -156,10 +155,13 @@
 (defmethod print-object ((hull voxel-hull) stream)
   (print-unreadable-object (hull stream :type T)
     (format stream "~a ~a " (aabb-min hull) (aabb-max hull))
-    (format stream "~a at ~d, ~d hulls"
+    (format stream "~a at ~d, ~d hulls, ~d voxels"
             (voxel-hull-axis hull)
             (voxel-hull-depth hull)
-            (voxel-hull-voxel-hull-count hull))))
+            (voxel-hull-voxel-hull-count hull)
+            (+ (length (voxel-hull-surface-voxels hull))
+               (length (voxel-hull-new-surface-voxels hull))
+               (length (voxel-hull-interior-voxels hull))))))
 
 (defstruct (cost-task
             (:constructor make-cost-task (a b))
@@ -356,15 +358,20 @@
     (make-convex-hull verts faces)))
 
 (defun make-aabb-tree (vertices indices)
+  (declare (type (simple-array single-float (*)) vertices))
+  (declare (type (simple-array (unsigned-byte 32) (*)) indices))
+  (declare (optimize speed (safety 1)))
   (let* ((max-faces-per-leaf 6)
          (num-faces (truncate (length indices) 3))
          (faces (make-array num-faces :element-type '(unsigned-byte 32)))
          (tree (%make-aabb-tree vertices indices faces))
          (nodes (aabb-tree-nodes tree))
          (depth 0))
+    (declare (type (unsigned-byte 32) depth))
     (dotimes (i num-faces)
       (setf (aref faces i) i))
     (labels ((rec (node start end)
+               (declare (type (unsigned-byte 32) start end))
                (let ((num-faces (- end start)))
                  (incf depth)
                  (setf (aabb-tree-depth tree) (max (aabb-tree-depth tree) depth))
@@ -377,6 +384,7 @@
                         (let ((left-count (partition-median tree node faces start end))
                               (i0 (make-aabb-node))
                               (i1 (make-aabb-node)))
+                          (declare (type (unsigned-byte 32) left-count))
                           (replace (aabb-node-children node) (list i0 i1))
                           (vector-push-extend i0 nodes)
                           (vector-push-extend i1 nodes)
@@ -464,21 +472,25 @@
     aabb))
 
 (defun partition-median (tree node faces start end)
+  (declare (optimize speed (safety 0)))
   (let ((axis (aabb-longest-axis node))
         (verts (aabb-tree-vertices tree))
         (indices (aabb-tree-indices tree)))
     (labels ((centroid (face)
+               (declare (type (unsigned-byte 32) face))
                (let* ((index (* 3 face))
                       (a (aref verts (+ axis (* 3 (aref indices (+ 0 index))))))
                       (b (aref verts (+ axis (* 3 (aref indices (+ 1 index))))))
                       (c (aref verts (+ axis (* 3 (aref indices (+ 2 index)))))))
                  (/ (+ a b c) 3.0)))
              (compare (lhs rhs)
+               (declare (optimize speed))
                (let ((a (centroid lhs))
                      (b (centroid rhs)))
                  (if (= a b)
                      (< lhs rhs)
                      (< a b)))))
+      (declare (dynamic-extent #'centroid #'compare))
       ;; KLUDGE: This SUUUUUCKS
       #-sbcl
       (let ((sub (make-array (- end start)
@@ -669,13 +681,12 @@
                                  :axis axis
                                  :voxels (voxel-hull-voxels parent)
                                  :voxel-scale (volume-scale volume)
-                                 :voxel-scale-half (* 0.5 (volume-scale volume))
                                  :voxel-adjust (v- (aabb-min volume) (* 0.5 (volume-scale volume)))
                                  :depth (1+ (voxel-hull-depth parent))
-                                 :m1 (voxel-hull-m1 parent)
-                                 :m2 (voxel-hull-m2 parent)
+                                 :m1 (copy-seq (voxel-hull-m1 parent))
+                                 :m2 (copy-seq (voxel-hull-m2 parent))
                                  :decomposer (voxel-hull-decomposer parent))))
-    (case axis
+    (ecase axis
       (:x- (setf (aref (voxel-hull-m2 hull) 0) split-loc))
       (:x+ (setf (aref (voxel-hull-m1 hull) 0) (1+ split-loc)))
       (:y- (setf (aref (voxel-hull-m2 hull) 1) split-loc))
@@ -723,7 +734,6 @@
                                  :max (aabb-max volume)
                                  :voxels (vector volume)
                                  :voxel-scale (volume-scale volume)
-                                 :voxel-scale-half (* 0.5 (volume-scale volume))
                                  :voxel-adjust (v- (aabb-min volume) (* 0.5 (volume-scale volume)))
                                  :surface-voxels (copy-seq (volume-surface-voxels volume))
                                  :interior-voxels (copy-seq (volume-interior-voxels volume))
@@ -746,7 +756,8 @@
 
 (defun build-raycast-mesh (hull)
   (when (/= 0 (length (voxel-hull-indices hull)))
-    (setf (voxel-hull-aabb-tree hull) (make-aabb-tree (voxel-hull-vertices hull) (voxel-hull-indices hull))))
+    (setf (voxel-hull-aabb-tree hull) (make-aabb-tree (ensure-f32 (voxel-hull-vertices hull))
+                                                      (ensure-u32 (voxel-hull-indices hull)))))
   hull)
 
 (defun compute-convex-hull (hull)
@@ -774,6 +785,8 @@
              (voxel-hull-m2 hull) (voxel-hull-m1 hull))))
 
 (defun voxel-hull-point (v hull)
+  (declare (optimize speed))
+  (declare (type voxel v))
   (let ((scale (voxel-hull-voxel-scale hull))
         (bmin (voxel-hull-voxel-adjust hull)))
     (vec (+ (* (voxel-x v) scale) (vx bmin))
@@ -781,6 +794,8 @@
          (+ (* (voxel-z v) scale) (vz bmin)))))
 
 (defun voxel-index (hull v)
+  (declare (optimize speed))
+  (declare (type voxel v))
   (or (gethash v (voxel-hull-voxel-index-map hull))
       (let ((p (voxel-hull-point v hull))
             (i (hash-table-count (voxel-hull-voxel-index-map hull))))
@@ -830,13 +845,13 @@
   (let ((d (map 'vector #'- (voxel-hull-m2 hull) (voxel-hull-m1 hull))))
     (cond ((and (<= (aref d 1) (aref d 0)) (<= (aref d 2) (aref d 0)))
            (values :x
-                   (/ (+ 1 (aref (voxel-hull-m2 hull) 0) (aref (voxel-hull-m1 hull) 0)) 2)))
+                   (truncate (+ 1 (aref (voxel-hull-m2 hull) 0) (aref (voxel-hull-m1 hull) 0)) 2)))
           ((and (<= (aref d 0) (aref d 1)) (<= (aref d 2) (aref d 1)))
            (values :y
-                   (/ (+ 1 (aref (voxel-hull-m2 hull) 1) (aref (voxel-hull-m1 hull) 1)) 2)))
+                   (truncate (+ 1 (aref (voxel-hull-m2 hull) 1) (aref (voxel-hull-m1 hull) 1)) 2)))
           (T
            (values :z
-                   (/ (+ 1 (aref (voxel-hull-m2 hull) 2) (aref (voxel-hull-m1 hull) 2)) 2))))))
+                   (truncate (+ 1 (aref (voxel-hull-m2 hull) 2) (aref (voxel-hull-m1 hull) 2)) 2))))))
 
 (defun raycast (hull p1 p2)
   (let* ((from (voxel-hull-point hull p1))
@@ -936,6 +951,7 @@
               (convex-hull-volume (voxel-hull-convex-hull vh))))
       (vector-push-extend vh pending)
       ;; Split hulls as much as possible
+      (dbg "Splitting voxel hulls")
       (loop while (< 0 (length pending))
             do (let ((count (+ (length pending) (length voxel-hulls)))
                      (old (copy-seq pending)))
@@ -952,6 +968,7 @@
                                  (when (voxel-hull-b hull)
                                    (vector-push-extend (voxel-hull-b hull) pending))))))))
     ;; Build the convex hulls from the voxel hulls
+    (dbg "Building convex hulls")
     (loop for hull across voxel-hulls
           do (vector-push-extend (voxel-hull-convex-hull hull) hulls))
     ;; Merge convex hulls down as much as needed
@@ -1008,4 +1025,5 @@
                                               minimum-edge-length)
   (declare (ignore convex-hulls resolution error-percentage max-recursion-depth
                    shrink-wrap-p max-vertices-per-convex-hull minimum-edge-length))
-  (%decompose (apply #'make-decomposer args) verts faces))
+  (let ((*dbg-start-time* (get-internal-real-time)))
+    (%decompose (apply #'make-decomposer args) verts faces)))

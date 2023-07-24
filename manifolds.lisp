@@ -3,8 +3,22 @@
 (defun u32 (&rest i)
   (make-array (length i) :element-type '(unsigned-byte 32) :initial-contents i))
 
+(defun ensure-u32 (a)
+  (etypecase a
+    ((simple-array (unsigned-byte 32) (*))
+     a)
+    (vector
+     (make-array (length a) :element-type '(unsigned-byte 32) :initial-contents a))))
+
 (defun f32 (&rest i)
   (make-array (length i) :element-type 'single-float :initial-contents (mapcar #'float i)))
+
+(defun ensure-f32 (a)
+  (etypecase a
+    ((simple-array single-float (*))
+     a)
+    (vector
+     (make-array (length a) :element-type 'single-float :initial-contents a))))
 
 (defmacro do-faces ((a b c faces &optional result) &body body)
   (let ((i (gensym "I"))

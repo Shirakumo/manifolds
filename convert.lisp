@@ -1,7 +1,10 @@
 (in-package #:org.shirakumo.fraf.manifolds)
 
+(defparameter *dbg-start-time* (get-internal-real-time))
+
 (defun dbg (&rest stuff)
-  (format *debug-io* "~&> ~{~a~^ ~}~%" stuff))
+  (format *debug-io* "~&~,2f> ~{~a~^ ~}~%"
+          (float (/ (- (get-internal-real-time) *dbg-start-time*) internal-time-units-per-second)) stuff))
 
 (defstruct (node
             (:constructor %node (location bsize faces &key number level)))
