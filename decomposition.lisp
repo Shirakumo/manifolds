@@ -198,6 +198,7 @@
   (max-recursion-depth 10 :type (unsigned-byte 32))
   (shrink-wrap-p T :type boolean)
   (max-vertices-per-convex-hull 64 :type (unsigned-byte 32))
+  (max-convex-hull-fragments 100000 :type (unsigned-byte 32))
   (minimum-edge-length 2 :type (unsigned-byte 32)))
 
 (defmethod print-object ((decomposer decomposer) stream)
@@ -353,7 +354,7 @@
 (defun combine-convex-hulls (a b)
   (multiple-value-bind (verts faces) 
       (org.shirakumo.fraf.quickhull:convex-hull
-       (concatenate '(simple-array (unsigned-byte 32))
+       (concatenate '(simple-array single-float (*))
                     (convex-hull-vertices a) (convex-hull-vertices b)))
     (make-convex-hull verts faces)))
 
@@ -929,7 +930,6 @@
   (let* ((pending (make-array 0 :adjustable T :fill-pointer T))
          (voxel-hulls (make-array 0 :adjustable T :fill-pointer T))
          (hulls (make-array 0 :adjustable T :fill-pointer T))
-         (max-convex-hull-fragments 100000)
          (bounds (aabb-bounds vertices))
          (center (aabb-center bounds)))
     (setf (decomposer-center decomposer) center)
@@ -954,12 +954,14 @@
       (dbg "Splitting voxel hulls")
       (loop while (< 0 (length pending))
             do (let ((count (+ (length pending) (length voxel-hulls)))
-                     (old (copy-seq pending)))
+                     (old (shiftf pending (make-array 0 :adjustable T :fill-pointer T))))
                  (loop for hull across old
-                       do (unless (or (voxel-hull-complete-p hull) (< max-convex-hull-fragments count))
+                       do (when (and (not (voxel-hull-complete-p hull))
+                                     (< count (decomposer-max-convex-hull-fragments decomposer)))
                             (perform-plane-split hull)))
                  (loop for hull across old
-                       do (cond ((or (voxel-hull-complete-p hull) (< max-convex-hull-fragments count))
+                       do (cond ((or (voxel-hull-complete-p hull)
+                                     (< (decomposer-max-convex-hull-fragments decomposer) count))
                                  (when (voxel-hull-convex-hull hull)
                                    (vector-push-extend hull voxel-hulls)))
                                 (T
@@ -1006,7 +1008,7 @@
                        (loop for task across tasks
                              do (add-cost decomposer task))))))))
     ;; Finalize by reducing hulls if necessary and scaling them
-    (dbg "Reducing hulls")
+    (dbg "Reducing convex hulls")
     (loop for i from 0 below (length hulls)
           for hull = (aref hulls i)
           do (when (or (< (decomposer-max-vertices-per-convex-hull decomposer)
@@ -1020,10 +1022,12 @@
                                               resolution
                                               error-percentage
                                               max-recursion-depth
+                                              max-convex-hull-fragments
                                               shrink-wrap-p
                                               max-vertices-per-convex-hull
                                               minimum-edge-length)
   (declare (ignore convex-hulls resolution error-percentage max-recursion-depth
+                   max-convex-hull-fragments
                    shrink-wrap-p max-vertices-per-convex-hull minimum-edge-length))
   (let ((*dbg-start-time* (get-internal-real-time)))
     (%decompose (apply #'make-decomposer args) verts faces)))

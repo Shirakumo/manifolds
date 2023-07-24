@@ -3,7 +3,7 @@
 (defparameter *dbg-start-time* (get-internal-real-time))
 
 (defun dbg (&rest stuff)
-  (format *debug-io* "~&~,2f> ~{~a~^ ~}~%"
+  (format *debug-io* "~&~6,2f> ~{~a~^ ~}~%"
           (float (/ (- (get-internal-real-time) *dbg-start-time*) internal-time-units-per-second)) stuff))
 
 (defstruct (node
