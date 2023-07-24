@@ -30,3 +30,7 @@
         7 6 1   1 0 7
         2 1 6   6 5 2
         0 3 4   4 7 0)))
+
+(define-test decomposition
+  :parent manifolds
+  (finish (multiple-value-call #'manifolds::decompose (cube) :resolution 100)))

@@ -335,3 +335,35 @@
                  (vector-push-extend b mesh-faces)
                  (vector-push-extend c mesh-faces)))
           collect (cons mesh-vertices (make-array (length mesh-faces) :element-type '(unsigned-byte 32) :initial-contents mesh-faces)))))
+
+(defun normalize (vertices indices &key (threshold 0.001) (center (vec 0 0 0)) (scale 1.0))
+  ;; TODO: could probably do this inline by going over verts first, then faces and only copying once.
+  (let ((tree (org.shirakumo.fraf.trial.space.kd-tree:make-kd-tree))
+        (new-vertices (make-array 0 :element-type 'single-float :adjustable T :fill-pointer T))
+        (new-indices (make-array 0 :element-type '(unsigned-byte 32) :adjustable T :fill-pointer T)))
+    (flet ((vertex-idx (p)
+             (let* ((p (nv* (nv- p center) scale))
+                    (nearest (org.shirakumo.fraf.trial.space.kd-tree:kd-tree-nearest p tree :max-radius threshold)))
+               (cond (nearest
+                      (vertex-index-index nearest))
+                     (T
+                      (let ((index (truncate (length new-vertices) 3)))
+                        (org.shirakumo.fraf.trial.space.kd-tree:kd-tree-insert
+                         (make-vertex-index (vx p) (vy p) (vz p) index) tree)
+                        (vector-push-extend (vx p) new-vertices)
+                        (vector-push-extend (vy p) new-vertices)
+                        (vector-push-extend (vz p) new-vertices)
+                        index))))))
+      (loop for i from 0 below (length indices) by 3
+            for p1 = (v vertices (aref indices (+ i 0)))
+            for p2 = (v vertices (aref indices (+ i 1)))
+            for p3 = (v vertices (aref indices (+ i 2)))
+            for i1 = (vertex-idx p1)
+            for i2 = (vertex-idx p2)
+            for i3 = (vertex-idx p3)
+            do (unless (or (= i1 i2) (= i1 i3) (= i2 i3))
+                 (vector-push-extend i1 new-indices)
+                 (vector-push-extend i2 new-indices)
+                 (vector-push-extend i3 new-indices))))
+    (values (replace (make-array (length new-vertices) :element-type 'single-float) new-vertices)
+            (replace (make-array (length new-indices) :element-type '(unsigned-byte 32)) new-indices))))
