@@ -347,9 +347,11 @@
 
 ;;; Actual algorithm
 (defun make-convex-hull (verts faces)
-  (%make-convex-hull :vertices verts :faces faces
-                     :center (centroid verts faces)
-                     :volume (convex-volume verts faces)))
+  (let ((volume (convex-volume verts faces)))
+    (assert (<= 0 volume))
+    (%make-convex-hull :vertices verts :faces faces
+                       :center (centroid verts faces)
+                       :volume volume)))
 
 (defun combine-convex-hulls (a b)
   (multiple-value-bind (verts faces) 
@@ -921,7 +923,9 @@
           do (setf (aref verts (+ 0 v)) (+ (vx center) (* scale (aref verts (+ 0 v)))))
              (setf (aref verts (+ 1 v)) (+ (vy center) (* scale (aref verts (+ 1 v)))))
              (setf (aref verts (+ 2 v)) (+ (vz center) (* scale (aref verts (+ 2 v))))))
-    (setf (convex-hull-volume hull) (convex-volume verts faces))
+    (let ((volume (convex-volume verts faces)))
+      (assert (<= 0 volume))
+      (setf (convex-hull-volume hull) volume))
     (setf (convex-hull-center hull) (centroid verts faces))
     hull))
 
