@@ -69,7 +69,7 @@
         (if (< y z) 2 1)
         (if (< x z) 2 0))))
 
-(declaim (ftype (function ((simple-array single-float (*)) &optional aabb) aabb) aabb-bounds))
+(declaim (ftype (function (simple-array &optional aabb) aabb) aabb-bounds))
 (defun aabb-bounds (vertices &optional (aabb (make-aabb)))
   (let ((min (aabb-min aabb))
         (max (aabb-max aabb)))

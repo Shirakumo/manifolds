@@ -1,5 +1,7 @@
 (in-package #:org.shirakumo.fraf.manifolds)
 
+(declaim (inline u32 ensure-u32 f32* f32 ensure-f32 f64* f64 ensure-f64))
+
 (defun u32 (&rest i)
   (make-array (length i) :element-type '(unsigned-byte 32) :initial-contents i))
 
@@ -10,6 +12,9 @@
     (vector
      (make-array (length a) :element-type '(unsigned-byte 32) :initial-contents a))))
 
+(defun f32* (a)
+  (float a 0f0))
+
 (defun f32 (&rest i)
   (make-array (length i) :element-type 'single-float :initial-contents (mapcar #'float i)))
 
@@ -19,6 +24,19 @@
      a)
     (vector
      (make-array (length a) :element-type 'single-float :initial-contents a))))
+
+(defun f64* (a)
+  (float a 0d0))
+
+(defun f64 (&rest i)
+  (make-array (length i) :element-type 'double-float :initial-contents (mapcar #'float i)))
+
+(defun ensure-f64 (a)
+  (etypecase a
+    ((simple-array double-float (*))
+     a)
+    (vector
+     (make-array (length a) :element-type 'double-float :initial-contents a))))
 
 (defmacro do-faces ((a b c faces &optional result) &body body)
   (let ((i (gensym "I"))
@@ -353,7 +371,7 @@
 (defun normalize (vertices indices &key (threshold 0.001) (center (vec 0 0 0)) (scale 1.0))
   ;; TODO: could probably do this inline by going over verts first, then faces and only copying once.
   (let ((tree (org.shirakumo.fraf.trial.space.kd-tree:make-kd-tree))
-        (new-vertices (make-array 0 :element-type 'single-float :adjustable T :fill-pointer T))
+        (new-vertices (make-array 0 :element-type 'double-float :adjustable T :fill-pointer T))
         (new-indices (make-array 0 :element-type '(unsigned-byte 32) :adjustable T :fill-pointer T)))
     (flet ((vertex-idx (p)
              (let* ((p (nv* (nv- p center) scale))
@@ -364,9 +382,9 @@
                       (let ((index (truncate (length new-vertices) 3)))
                         (org.shirakumo.fraf.trial.space.kd-tree:kd-tree-insert
                          (make-vertex-index (vx p) (vy p) (vz p) index) tree)
-                        (vector-push-extend (vx p) new-vertices)
-                        (vector-push-extend (vy p) new-vertices)
-                        (vector-push-extend (vz p) new-vertices)
+                        (vector-push-extend (float (vx p) 0d0) new-vertices)
+                        (vector-push-extend (float (vy p) 0d0) new-vertices)
+                        (vector-push-extend (float (vz p) 0d0) new-vertices)
                         index))))))
       (loop for i from 0 below (length indices) by 3
             for p1 = (v vertices (aref indices (+ i 0)))
@@ -379,5 +397,5 @@
                  (vector-push-extend i1 new-indices)
                  (vector-push-extend i2 new-indices)
                  (vector-push-extend i3 new-indices))))
-    (values (replace (make-array (length new-vertices) :element-type 'single-float) new-vertices)
+    (values (replace (make-array (length new-vertices) :element-type 'double-float) new-vertices)
             (replace (make-array (length new-indices) :element-type '(unsigned-byte 32)) new-indices))))

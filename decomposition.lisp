@@ -39,7 +39,7 @@
             (:constructor %make-aabb-tree (vertices indices faces))
             (:copier NIL)
             (:predicate NIL))
-  (vertices NIL :type (simple-array single-float (*)))
+  (vertices NIL :type (simple-array double-float (*)))
   (indices NIL :type (simple-array (unsigned-byte 32) (*)))
   (faces NIL :type (simple-array (unsigned-byte 32) (*)))
   (nodes (make-array 0 :adjustable T :fill-pointer T) :type (array T (*)))
@@ -57,9 +57,9 @@
             (:include aabb)
             (:copier NIL)
             (:predicate NIL))
-  (vertices (make-array 0 :element-type 'single-float) :type (simple-array single-float (*)))
+  (vertices (make-array 0 :element-type 'double-float) :type (simple-array double-float (*)))
   (faces (make-array 0 :element-type '(unsigned-byte 32)) :type (simple-array (unsigned-byte 32) (*)))
-  (volume 0.0 :type single-float)
+  (volume 0.0d0 :type double-float)
   (center (vec 0 0 0) :type vec3))
 
 (defmethod print-object ((hull convex-hull) stream)
@@ -106,7 +106,7 @@
             (:constructor %make-volume)
             (:copier NIL)
             (:predicate NIL))
-  (scale 1.0 :type single-float)
+  (scale 1.0d0 :type double-float)
   (dimensions (make-array 3 :element-type '(unsigned-byte 32)) :type (simple-array (unsigned-byte 32) (3)))
   (voxels-on-surface 0 :type (unsigned-byte 64))
   (voxels-inside-surface 0 :type (unsigned-byte 64))
@@ -131,12 +131,12 @@
             (:predicate NIL))
   (axis :x- :type (member :x- :x+ :y- :y+ :z- :z+))
   (voxels (make-array 0 :adjustable T :fill-pointer T) :type vector)
-  (voxel-scale 0.0 :type single-float)
+  (voxel-scale 0.0d0 :type double-float)
   (voxel-adjust (vec 0 0 0) :type vec3)
   (depth 0 :type (unsigned-byte 32))
-  (volume-error 0.0 :type single-float)
-  (voxel-volume 0.0 :type single-float)
-  (volume 0.0 :type single-float)
+  (volume-error 0.0d0 :type double-float)
+  (voxel-volume 0.0d0 :type double-float)
+  (volume 0.0d0 :type double-float)
   (convex-hull NIL :type (or null convex-hull))
   (surface-voxels (make-array 0 :element-type 'voxel :adjustable T :fill-pointer T) :type (vector voxel))
   (new-surface-voxels (make-array 0 :element-type 'voxel :adjustable T :fill-pointer T) :type (vector voxel))
@@ -147,7 +147,7 @@
   (m2 (make-array 3 :element-type '(unsigned-byte 32)) :type (simple-array (unsigned-byte 32) (3)))
   (aabb-tree NIL :type (or null aabb-tree))
   (voxel-index-map (make-hash-table :test 'eql) :type hash-table)
-  (vertices (make-array 0 :element-type 'single-float :adjustable T :fill-pointer T) :type (vector single-float))
+  (vertices (make-array 0 :element-type 'double-float :adjustable T :fill-pointer T) :type (vector double-float))
   (indices (make-array 0 :element-type '(unsigned-byte 32) :adjustable T :fill-pointer T) :type (vector (unsigned-byte 32)))
   (voxel-hull-count 0 :type (unsigned-byte 32))
   (decomposer NIL :type T))
@@ -169,7 +169,7 @@
             (:predicate NIL))
   (a NIL :type (or null convex-hull))
   (b NIL :type (or null convex-hull))
-  (concavity 0.0 :type single-float))
+  (concavity 0.0d0 :type double-float))
 
 (defstruct (hull-pair
             (:constructor make-hull-pair (a b concavity))
@@ -177,7 +177,7 @@
             (:predicate NIL))
   (a NIL :type (or null convex-hull))
   (b NIL :type (or null convex-hull))
-  (concavity 0.0 :type single-float))
+  (concavity 0.0d0 :type double-float))
 
 (defstruct (decomposer
             (:constructor make-decomposer)
@@ -186,15 +186,15 @@
   (aabb-tree NIL :type (or null aabb-tree))
   (voxelize NIL :type (or null volume))
   (center (vec3) :type vec3)
-  (scale 1.0 :type single-float)
-  (recip-scale 1.0 :type single-float)
-  (overall-hull-volume 0.0 :type single-float)
-  (voxel-scale 0.0 :type single-float)
-  (hull-pair-queue (priority-queue:make-pqueue #'<= :key-type 'single-float) :type priority-queue::pqueue)
+  (scale 1.0d0 :type double-float)
+  (recip-scale 1.0d0 :type double-float)
+  (overall-hull-volume 0.0d0 :type double-float)
+  (voxel-scale 0.0d0 :type double-float)
+  (hull-pair-queue (priority-queue:make-pqueue #'<= :key-type 'double-float) :type priority-queue::pqueue)
   ;; Parameters
   (convex-hulls 64 :type (unsigned-byte 32))
   (resolution 400000 :type (unsigned-byte 32))
-  (error-percentage 1.0 :type single-float)
+  (error-percentage 1.0d0 :type double-float)
   (max-recursion-depth 10 :type (unsigned-byte 32))
   (shrink-wrap-p T :type boolean)
   (max-vertices-per-convex-hull 64 :type (unsigned-byte 32))
@@ -229,7 +229,7 @@
                          (setf inside-p NIL)))))
       (test vx3) (test vy3) (test vz3))
     (if inside-p
-        0.0
+        0.0d0
         (multiple-value-bind (tmax taxis) (vmaxcoeff ta)
           (when (and (<= 0 tmax)
                      (or (eq :x taxis) (and (< (vx (aabb-min aabb)) (vx ta)) (< (vx ta) (vx (aabb-max aabb)))))
@@ -248,9 +248,9 @@
     (when (<= 0 tt)
       (let* ((e (v- (vc dir ap)))
              (v (* (v. ac e) ood)))
-        (when (<= 0.0 v 1.0)
+        (when (<= 0 v 1)
           (let ((w (- (* (v. ab e) ood))))
-            (when (and (<= 0.0 w) (<= (+ v w) 1.0))
+            (when (and (<= 0 w) (<= (+ v w) 1))
               (let ((u (- 1 v w)))
                 (values t u v w d n)))))))))
 
@@ -356,12 +356,12 @@
 (defun combine-convex-hulls (a b)
   (multiple-value-bind (verts faces) 
       (org.shirakumo.fraf.quickhull:convex-hull
-       (concatenate '(simple-array single-float (*))
+       (concatenate '(simple-array double-float (*))
                     (convex-hull-vertices a) (convex-hull-vertices b)))
     (make-convex-hull verts faces)))
 
 (defun make-aabb-tree (vertices indices)
-  (declare (type (simple-array single-float (*)) vertices))
+  (declare (type (simple-array double-float (*)) vertices))
   (declare (type (simple-array (unsigned-byte 32) (*)) indices))
   (declare (optimize speed (safety 1)))
   (let* ((max-faces-per-leaf 6)
@@ -399,7 +399,7 @@
     tree))
 
 (defun trace-ray (tree start dir)
-  (let ((tt most-positive-single-float)
+  (let ((tt most-positive-double-float)
         u v w face-sign face-index)
     (labels ((rec (node)
                (cond ((= 0 (length (aabb-node-faces node)))
@@ -426,7 +426,7 @@
                                    (setf tt tt2 u u2 v v2 w w2 face-sign s2)
                                    (setf face-index (aref (aabb-node-faces node) i)))))))))
       (rec (aref (aabb-tree-nodes tree) 0)))
-    (unless (= tt most-positive-single-float)
+    (unless (= tt most-positive-double-float)
       (values tt u v w face-sign face-index))))
 
 (defun closest-point-within-distance (tree point max-distance)
@@ -539,22 +539,22 @@
            (bounds (aabb-bounds points))
            (d (aabb-size bounds))
            (dims (make-array 3 :element-type '(unsigned-byte 32)))
-           (r 0.0))
+           (r 0.0d0))
       (cond ((and (<= (vy d) (vx d)) (<= (vz d) (vx d)))
              (replace dims (list dim
                                  (+ 2 (truncate (* dim (vy d)) (vx d)))
                                  (+ 2 (truncate (* dim (vz d)) (vx d)))))
-             (setf r (vx d)))
+             (setf r (f64* (vx d))))
             ((and (<= (vx d) (vy d)) (<= (vz d) (vx d)))
              (replace dims (list dim
                                  (+ 2 (truncate (* dim (vx d)) (vy d)))
                                  (+ 2 (truncate (* dim (vz d)) (vy d)))))
-             (setf r (vy d)))
+             (setf r (f64* (vy d))))
             (T
              (replace dims (list dim
                                  (+ 2 (truncate (* dim (vx d)) (vz d)))
                                  (+ 2 (truncate (* dim (vy d)) (vz d)))))
-             (setf r (vz d))))
+             (setf r (f64* (vz d)))))
       (let* ((scale (/ r (1- dim)))
              (inv-scale (/ (1- dim) r))
              (data (make-array (* (aref dims 0) (aref dims 1) (aref dims 2)) 
@@ -759,7 +759,7 @@
 
 (defun build-raycast-mesh (hull)
   (when (/= 0 (length (voxel-hull-indices hull)))
-    (setf (voxel-hull-aabb-tree hull) (make-aabb-tree (ensure-f32 (voxel-hull-vertices hull))
+    (setf (voxel-hull-aabb-tree hull) (make-aabb-tree (ensure-f64 (voxel-hull-vertices hull))
                                                       (ensure-u32 (voxel-hull-indices hull)))))
   hull)
 
@@ -803,9 +803,9 @@
       (let ((p (voxel-hull-point v hull))
             (i (hash-table-count (voxel-hull-voxel-index-map hull))))
         (setf (gethash v (voxel-hull-voxel-index-map hull)) i)
-        (vector-push-extend (vx p) (voxel-hull-vertices hull))
-        (vector-push-extend (vy p) (voxel-hull-vertices hull))
-        (vector-push-extend (vz p) (voxel-hull-vertices hull))
+        (vector-push-extend (f64* (vx p)) (voxel-hull-vertices hull))
+        (vector-push-extend (f64* (vy p)) (voxel-hull-vertices hull))
+        (vector-push-extend (f64* (vz p)) (voxel-hull-vertices hull))
         i)))
 
 (defun add-voxel-box (hull v)
@@ -859,7 +859,7 @@
 (defun raycast (hull p1 p2)
   (let* ((from (voxel-hull-point hull p1))
          (dir (nvunit (v- (voxel-hull-point hull p2) from))))
-    (or (trace-ray (voxel-hull-aabb-tree hull) from dir) 0.0)))
+    (or (trace-ray (voxel-hull-aabb-tree hull) from dir) 0.0d0)))
 
 ;; Omit find-concavity
 
@@ -937,9 +937,9 @@
          (bounds (aabb-bounds vertices))
          (center (aabb-center bounds)))
     (setf (decomposer-center decomposer) center)
-    (setf (decomposer-scale decomposer) (vmaxcoeff (v- (aabb-max bounds) (aabb-min bounds))))
+    (setf (decomposer-scale decomposer) (f64* (vmaxcoeff (v- (aabb-max bounds) (aabb-min bounds)))))
     (setf (decomposer-recip-scale decomposer) (if (= 0 (decomposer-scale decomposer))
-                                                  0.0
+                                                  0.0d0
                                                   (decomposer-scale decomposer)))
     (dbg "Normalizing mesh")
     (multiple-value-bind (vertices indices) (normalize vertices indices :center center :scale (decomposer-scale decomposer))
