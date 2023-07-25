@@ -283,7 +283,7 @@
              (d5 (v. ab cp))
              (d6 (v. ac cp)))
         (when (and (<= d6 0) (<= d5 d6))
-          (finish 0 1 c)))
+          (finish c 0 1)))
       (let* ((vb (- (* d5 d2) (* d1 d6))))
         (when (and (<= vb 0) (<= 0 d2) (<= d6 0))
           (finish (v+ a (v* ac w)) 0 (/ d2 (- d2 d6)))))
@@ -452,10 +452,9 @@
                      (T
                       (loop for i from 0
                             for face across (aabb-node-faces node)
-                            for base-vertex = (* 3 (aref (aabb-tree-indices tree) face))
-                            for a = (v (aabb-tree-vertices tree) (+ base-vertex 0))
-                            for b = (v (aabb-tree-vertices tree) (+ base-vertex 1))
-                            for c = (v (aabb-tree-vertices tree) (+ base-vertex 2))
+                            for a = (v (aabb-tree-vertices tree) (aref (aabb-tree-indices tree) (+ 0 (* 3 face))))
+                            for b = (v (aabb-tree-vertices tree) (aref (aabb-tree-indices tree) (+ 1 (* 3 face))))
+                            for c = (v (aabb-tree-vertices tree) (aref (aabb-tree-indices tree) (+ 2 (* 3 face))))
                             do (multiple-value-bind (cp v2 w2) (closest-point-on-triangle* a b c point)
                                  (let ((sqr-distance2 (vsqrdistance cp point)))
                                    (when (< sqr-distance2 sqr-distance)
@@ -674,7 +673,7 @@
           for p = (v verts j)
           for closest = (closest-point-within-distance aabb-tree p distance-threshold)
           do (when closest
-               (setf (aref verts j) closest))))
+               (setf (v verts j) closest))))
   (org.shirakumo.fraf.quickhull:convex-hull verts :max-vertex-count max-hull-vertex-count))
 
 (defun make-voxel-hull (parent axis split-loc)
@@ -925,7 +924,7 @@
              (setf (aref verts (+ 2 v)) (+ (vz center) (* scale (aref verts (+ 2 v))))))
     (let ((volume (convex-volume verts faces)))
       (assert (<= 0 volume))
-      (setf (convex-hull-volume hull) volume))
+      (setf (convex-hull-volume hull) (float volume 0d0)))
     (setf (convex-hull-center hull) (centroid verts faces))
     hull))
 

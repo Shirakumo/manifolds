@@ -105,12 +105,25 @@
                  (vector-push-extend (cons a b) edges)))
       edges)))
 
-(declaim (inline v sbitp (setf sbitp)))
+(declaim (inline v (setf v) sbitp (setf sbitp)))
 (defun v (vertices i)
   (let ((i (* 3 i)))
     (vec (aref vertices (+ 0 i))
          (aref vertices (+ 1 i))
          (aref vertices (+ 2 i)))))
+
+(defun (setf v) (v vertices i)
+  (let ((i (* 3 i)))
+    (ecase (array-element-type vertices)
+      (single-float
+       (setf (aref vertices (+ 0 i)) (vx3 v))
+       (setf (aref vertices (+ 1 i)) (vy3 v))
+       (setf (aref vertices (+ 2 i)) (vz3 v)))
+      (double-float
+       (setf (aref vertices (+ 0 i)) (float (vx3 v) 0d0))
+       (setf (aref vertices (+ 1 i)) (float (vy3 v) 0d0))
+       (setf (aref vertices (+ 2 i)) (float (vz3 v) 0d0))))
+    v))
 
 (defun sbitp (array i)
   (= 1 (sbit array i)))
