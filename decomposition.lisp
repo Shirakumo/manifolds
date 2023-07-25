@@ -351,7 +351,7 @@
     (assert (<= 0 volume))
     (%make-convex-hull :vertices verts :faces faces
                        :center (centroid verts faces)
-                       :volume volume)))
+                       :volume (float volume 0d0))))
 
 (defun combine-convex-hulls (a b)
   (multiple-value-bind (verts faces) 
