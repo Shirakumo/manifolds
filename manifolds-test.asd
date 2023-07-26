@@ -9,5 +9,5 @@
   :source-control (:git "https://github.com/shirakumo/manifolds.git")
   :serial T
   :components ((:file "test"))
-  :depends-on (:manifolds :parachute)
+  :depends-on (:manifolds :cl-wavefront :parachute)
   :perform (asdf:test-op (op c) (uiop:symbol-call :parachute :test :manifolds-test)))

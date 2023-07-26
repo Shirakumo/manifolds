@@ -1035,34 +1035,3 @@
                    shrink-wrap-p max-vertices-per-convex-hull minimum-edge-length))
   (let ((*dbg-start-time* (get-internal-real-time)))
     (%decompose (apply #'make-decomposer args) verts faces)))
-
-(defun export-hulls (hulls)
-  (org.shirakumo.fraf.wavefront:serialize
-   (loop with colors = #(#(1.0 0.0 0.0)
-                         #(0.0 1.0 0.0)
-                         #(0.0 0.0 1.0)
-                         #(0.5 0.5 0.0)
-                         #(0.0 0.5 0.5)
-                         #(0.5 0.0 0.5)
-                         #(1.0 1.0 1.0)
-                         #(0.1 0.1 0.1))
-         for hull across hulls
-         for i from 0
-         for mtl = (make-instance 'org.shirakumo.fraf.wavefront:material
-                                  :name (format NIL "c~a" i)
-                                  :diffuse-factor (aref colors (mod i (length colors))))
-         collect (make-instance 'org.shirakumo.fraf.wavefront:mesh
-                                :vertex-data (convex-hull-vertices hull)
-                                :index-data (convex-hull-faces hull)
-                                :attributes '(:position)
-                                :material mtl))
-   #p"~/a.obj" :if-exists :supersede)
-  hulls)
-
-(defun decompose-hulls (file &rest args)
-  (let ((m (first (org.shirakumo.fraf.wavefront:extract-meshes (org.shirakumo.fraf.wavefront:parse file)
-                                                               NIL '(:position)))))
-    (apply #'decompose
-           (org.shirakumo.fraf.wavefront:vertex-data m)
-           (org.shirakumo.fraf.wavefront:index-data m)
-           args)))
