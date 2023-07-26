@@ -545,14 +545,14 @@
                                  (+ 2 (truncate (* dim (vz d)) (vx d)))))
              (setf r (f64* (vx d))))
             ((and (<= (vx d) (vy d)) (<= (vz d) (vx d)))
-             (replace dims (list dim
-                                 (+ 2 (truncate (* dim (vx d)) (vy d)))
+             (replace dims (list (+ 2 (truncate (* dim (vx d)) (vy d)))
+                                 dim
                                  (+ 2 (truncate (* dim (vz d)) (vy d)))))
              (setf r (f64* (vy d))))
             (T
-             (replace dims (list dim
-                                 (+ 2 (truncate (* dim (vx d)) (vz d)))
-                                 (+ 2 (truncate (* dim (vy d)) (vz d)))))
+             (replace dims (list (+ 2 (truncate (* dim (vx d)) (vz d)))
+                                 (+ 2 (truncate (* dim (vy d)) (vz d)))
+                                 dim))
              (setf r (f64* (vz d)))))
       (let* ((scale (/ r (1- dim)))
              (inv-scale (/ (1- dim) r))
@@ -566,11 +566,12 @@
               for i1 = 0 for j1 = 0 for k1 = 0
               do (loop for c from 0 below 3
                        for pt = (v points (aref indices (+ base-index c)))
-                       do (setf (aref p c) (nv* (v- pt (aabb-min bounds)) inv-scale))
-                          (let ((i (truncate (+ 0.5 (vx (aref p c)))))
-                                (j (truncate (+ 0.5 (vy (aref p c)))))
-                                (k (truncate (+ 0.5 (vz (aref p c))))))
+                       do (let* ((pt (nv* (v- pt (aabb-min bounds)) inv-scale))
+                                 (i (truncate (+ 0.5 (vx pt))))
+                                 (j (truncate (+ 0.5 (vy pt))))
+                                 (k (truncate (+ 0.5 (vz pt)))))
                             (assert (and (< i (aref dims 0)) (< j (aref dims 1)) (< k (aref dims 2))))
+                            (setf (aref p c) pt)
                             (cond ((= 0 c)
                                    (setf i0 i i1 i)
                                    (setf j0 j j1 j)
