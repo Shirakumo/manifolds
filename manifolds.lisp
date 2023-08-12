@@ -76,6 +76,29 @@
       (pushnew a (aref adjacency c))
       (pushnew b (aref adjacency c)))))
 
+(defun face-adjacency-list (faces &optional adjacency)
+  (check-type faces (simple-array (unsigned-byte 32) (*)))
+  (let ((table (make-hash-table :test 'eql))
+        (adjacency (or adjacency
+                       (make-array (truncate (length faces) 3) :initial-element ())))
+        (face 0))
+    (flet ((edge (a b face)
+             (when (< b a)
+               (rotatef a b))
+             (let ((edge (+ (ash a 32) b)))
+               (push face (gethash edge table)))))
+      (do-faces (a b c faces)
+        (edge a b face)
+        (edge b c face)
+        (edge c a face)
+        (incf face)))
+    (loop for adjacents being the hash-values of table
+          do (loop for face in adjacents
+                   do (loop for other in adjacents
+                            unless (= other face)
+                            do (push other (aref adjacency face)))))
+    adjacency))
+
 (defun half-edge-list (faces)
   (check-type faces (simple-array (unsigned-byte 32) (*)))
   (let ((edges (make-array (length faces) :element-type 'cons))
@@ -116,7 +139,7 @@
                ;; as they cannot be on the boundary.
                (if (gethash rev-edge edge-table)
                    (remhash rev-edge edge-table)
-                   (gethash edge edge-table) (cons a b)))))
+                   (setf (gethash edge edge-table) (cons a b))))))
       (do-faces (a b c faces)
         (edge a b)
         (edge b c)
@@ -409,6 +432,7 @@
                  (vector-push-extend c mesh-faces)))
           collect (cons mesh-vertices (make-array (length mesh-faces) :element-type '(unsigned-byte 32) :initial-contents mesh-faces)))))
 
+#++
 (defun normalize (vertices indices &key (threshold 0.001) (center (vec 0 0 0)) (scale 1.0))
   ;; TODO: could probably do this inline by going over verts first, then faces and only copying once.
   (let ((tree (org.shirakumo.fraf.trial.space.kd-tree:make-kd-tree))
