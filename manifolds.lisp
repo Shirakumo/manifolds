@@ -105,6 +105,26 @@
                  (vector-push-extend (cons a b) edges)))
       edges)))
 
+(defun boundary-list (faces)
+  (check-type faces (simple-array (unsigned-byte 32) (*)))
+  (let ((edge-table (make-hash-table :test 'eql))
+        (edges (make-array 0 :element-type 'cons :adjustable T :fill-pointer T)))
+    (flet ((edge (a b)
+             (let ((edge (+ (ash a 32) b))
+                   (rev-edge (+ b (ash a 32))))
+               ;; If we already recorded the reverse edge, remove both
+               ;; as they cannot be on the boundary.
+               (if (gethash rev-edge edge-table)
+                   (remhash rev-edge edge-table)
+                   (gethash edge edge-table) (cons a b)))))
+      (do-faces (a b c faces)
+        (edge a b)
+        (edge b c)
+        (edge c a))
+      (loop for edge being the hash-keys of edge-table
+            do (vector-push-extend edge edges))
+      edges)))
+
 (declaim (inline v (setf v) sbitp (setf sbitp)))
 (defun v (vertices i)
   (let ((i (* 3 i)))
@@ -163,6 +183,14 @@
                        (v2norm (v- p3 p1 (v* (v- p2 p1) (/ (v. (v- p3 p1) (v- p2 p1))
                                                            (* base base))))))))
       (* 0.5 base height))))
+
+(defun surface-area (vertices faces)
+  (loop for face from 0 below (truncate (length faces) 3)
+        sum (face-area vertices faces face)))
+
+(defun boundary-length (vertices faces)
+  (loop for (a b) across (boundary-list faces)
+        sum (vdistance (v vertices a) (v vertices b))))
 
 (defun centroid (vertices faces)
   (let ((numerator (vec 0 0 0))

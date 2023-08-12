@@ -10,12 +10,7 @@
   :serial T
   :components ((:file "package")
                (:file "manifolds")
-               (:file "aabb")
-               (:file "convert")
-               (:file "decomposition"))
+               (:file "convert"))
   :depends-on (:3d-vectors
-               :3d-spaces
-               :quickhull
-               :priority-queue
                :documentation-utils)
   :in-order-to ((asdf:test-op (asdf:test-op :manifolds-test))))
