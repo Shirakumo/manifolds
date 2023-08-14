@@ -11,6 +11,6 @@
   :components ((:file "package")
                (:file "manifolds")
                (:file "convert"))
-  :depends-on (:3d-vectors
+  :depends-on (:3d-math
                :documentation-utils)
   :in-order-to ((asdf:test-op (asdf:test-op :manifolds-test))))

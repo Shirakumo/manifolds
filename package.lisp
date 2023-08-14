@@ -1,5 +1,5 @@
 (defpackage #:org.shirakumo.fraf.manifolds
-  (:use #:cl #:org.shirakumo.flare.vector)
+  (:use #:cl #:org.shirakumo.fraf.math)
   (:export
    #:do-faces
    #:vertex-adjacency-list

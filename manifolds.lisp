@@ -101,7 +101,7 @@
 
 (defun half-edge-list (faces)
   (check-type faces (simple-array (unsigned-byte 32) (*)))
-  (let ((edges (make-array (length faces) :element-type 'cons))
+  (let ((edges (make-array (length faces) :element-type T))
         (i 0))
     (flet ((edge (a b)
              (setf (aref edges i) (cons a b))
@@ -151,21 +151,27 @@
 (declaim (inline v (setf v) sbitp (setf sbitp)))
 (defun v (vertices i)
   (let ((i (* 3 i)))
-    (vec (aref vertices (+ 0 i))
-         (aref vertices (+ 1 i))
-         (aref vertices (+ 2 i)))))
+    (etypecase vertices
+      ((simple-array single-float)
+       (vec (aref vertices (+ 0 i))
+            (aref vertices (+ 1 i))
+            (aref vertices (+ 2 i))))
+      ((simple-array double-float)
+       (dvec (aref vertices (+ 0 i))
+             (aref vertices (+ 1 i))
+             (aref vertices (+ 2 i)))))))
 
 (defun (setf v) (v vertices i)
   (let ((i (* 3 i)))
-    (ecase (array-element-type vertices)
-      (single-float
-       (setf (aref vertices (+ 0 i)) (vx3 v))
-       (setf (aref vertices (+ 1 i)) (vy3 v))
-       (setf (aref vertices (+ 2 i)) (vz3 v)))
-      (double-float
-       (setf (aref vertices (+ 0 i)) (float (vx3 v) 0d0))
-       (setf (aref vertices (+ 1 i)) (float (vy3 v) 0d0))
-       (setf (aref vertices (+ 2 i)) (float (vz3 v) 0d0))))
+    (etypecase vertices
+      ((simple-array single-float)
+       (setf (aref vertices (+ 0 i)) (vx v))
+       (setf (aref vertices (+ 1 i)) (vy v))
+       (setf (aref vertices (+ 2 i)) (vz v)))
+      ((simple-array double-float)
+       (setf (aref vertices (+ 0 i)) (float (vx v) 0d0))
+       (setf (aref vertices (+ 1 i)) (float (vy v) 0d0))
+       (setf (aref vertices (+ 2 i)) (float (vz v) 0d0))))
     v))
 
 (defun sbitp (array i)
