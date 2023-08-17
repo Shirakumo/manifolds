@@ -3,11 +3,11 @@
 (defmacro do-faces ((a b c faces &optional result) &body body)
   (let ((i (gensym "I"))
         (f (gensym "F")))
-    `(loop with ,f = ,faces
+    `(loop with ,f of-type face-array = ,faces
            for ,i from 0 below (length ,f) by 3
-           for ,a = (aref ,f (+ 0 ,i))
-           for ,b = (aref ,f (+ 1 ,i))
-           for ,c = (aref ,f (+ 2 ,i))
+           for ,a of-type vertex = (aref ,f (+ 0 ,i))
+           for ,b of-type vertex = (aref ,f (+ 1 ,i))
+           for ,c of-type vertex = (aref ,f (+ 2 ,i))
            do (progn ,@body)
            finally (return ,result))))
 
@@ -27,7 +27,7 @@
          ,result))))
 
 (defun vertex-adjacency-list (faces &optional adjacency)
-  (check-type faces (simple-array (unsigned-byte 32) (*)))
+  (check-type faces face-array)
   (let ((adjacency (or adjacency
                        (make-array (1+ (loop for idx across faces maximize idx)) :initial-element ()))))
     (do-faces (a b c faces adjacency)
@@ -39,7 +39,7 @@
       (pushnew b (aref adjacency c)))))
 
 (defun face-adjacency-list (faces &optional adjacency)
-  (check-type faces (simple-array (unsigned-byte 32) (*)))
+  (check-type faces face-array)
   (let ((table (make-hash-table :test 'eql))
         (adjacency (or adjacency
                        (make-array (truncate (length faces) 3) :initial-element ())))
@@ -62,7 +62,7 @@
     adjacency))
 
 (defun half-edge-list (faces)
-  (check-type faces (simple-array (unsigned-byte 32) (*)))
+  (check-type faces face-array)
   (let ((edges (make-array (length faces) :element-type T))
         (i 0))
     (flet ((edge (a b)
@@ -74,7 +74,7 @@
         (edge c a)))))
 
 (defun edge-list (faces)
-  (check-type faces (simple-array (unsigned-byte 32) (*)))
+  (check-type faces face-array)
   (let ((edge-table (make-hash-table :test 'eql))
         (edges (make-array 0 :element-type 'cons :adjustable T :fill-pointer T)))
     (flet ((edge (a b)
@@ -91,7 +91,7 @@
       edges)))
 
 (defun boundary-list (faces)
-  (check-type faces (simple-array (unsigned-byte 32) (*)))
+  (check-type faces face-array)
   (let ((edge-table (make-hash-table :test 'eql))
         (edges (make-array 0 :element-type 'cons :adjustable T :fill-pointer T)))
     (flet ((edge (a b)
@@ -112,25 +112,29 @@
 
 (declaim (inline v (setf v) sbitp (setf sbitp)))
 (defun v (vertices i)
+  (check-type vertices vertex-array)
+  (check-type i face)
   (let ((i (* 3 i)))
     (etypecase vertices
-      ((simple-array single-float)
+      ((vertex-array single-float)
        (vec (aref vertices (+ 0 i))
             (aref vertices (+ 1 i))
             (aref vertices (+ 2 i))))
-      ((simple-array double-float)
+      ((vertex-array double-float)
        (dvec (aref vertices (+ 0 i))
              (aref vertices (+ 1 i))
              (aref vertices (+ 2 i)))))))
 
 (defun (setf v) (v vertices i)
+  (check-type vertices vertex-array)
+  (check-type i face)
   (let ((i (* 3 i)))
     (etypecase vertices
-      ((simple-array single-float)
+      ((vertex-array single-float)
        (setf (aref vertices (+ 0 i)) (vx v))
        (setf (aref vertices (+ 1 i)) (vy v))
        (setf (aref vertices (+ 2 i)) (vz v)))
-      ((simple-array double-float)
+      ((vertex-array double-float)
        (setf (aref vertices (+ 0 i)) (float (vx v) 0d0))
        (setf (aref vertices (+ 1 i)) (float (vy v) 0d0))
        (setf (aref vertices (+ 2 i)) (float (vz v) 0d0))))
@@ -143,6 +147,9 @@
   (setf (sbit array i) (if value 1 0)))
 
 (defun face-normal (vertices faces face)
+  (check-type vertices vertex-array)
+  (check-type faces face-array)
+  (check-type face face)
   (let* ((i (* 3 face))
          (a (v vertices (aref faces (+ 0 i))))
          (b (v vertices (aref faces (+ 1 i))))
@@ -157,6 +164,8 @@
     (vc (v- b a) (v- c a))))
 
 (defun face-normals (vertices faces &optional (face-normals (make-array (truncate (length faces) 3))))
+  (check-type vertices vertex-array)
+  (check-type faces face-array)
   (dotimes (i (length face-normals) face-normals)
     (setf (aref face-normals i) (face-normal vertices faces i))))
 
@@ -165,6 +174,9 @@
     (setf (aref face-normals i) (face-normal* vertices faces i))))
 
 (defun face-area (vertices faces face)
+  (check-type vertices vertex-array)
+  (check-type faces face-array)
+  (check-type face face)
   (let* ((i (* 3 face))
          (p1 (v vertices (aref faces (+ 0 i))))
          (p2 (v vertices (aref faces (+ 1 i))))
@@ -176,14 +188,20 @@
       (* 0.5 base height))))
 
 (defun surface-area (vertices faces)
+  (check-type vertices vertex-array)
+  (check-type faces face-array)
   (loop for face from 0 below (truncate (length faces) 3)
         sum (face-area vertices faces face)))
 
 (defun boundary-length (vertices faces)
+  (check-type vertices vertex-array)
+  (check-type faces face-array)
   (loop for (a b) across (boundary-list faces)
         sum (vdistance (v vertices a) (v vertices b))))
 
 (defun centroid (vertices faces)
+  (check-type vertices vertex-array)
+  (check-type faces face-array)
   (let ((numerator (vec 0 0 0))
         (denominator 0.0))
     (loop for i from 0 below (length faces) by 3
@@ -199,6 +217,8 @@
         (nv* numerator (/ denominator)))))
 
 (defun convex-volume (vertices faces)
+  (check-type vertices vertex-array)
+  (check-type faces face-array)
   (let ((bary (vec3)))
     (loop for i from 0 below (length vertices) by 3
           do (incf (vx bary) (aref vertices (+ i 0)))
@@ -215,6 +235,9 @@
          6.0))))
 
 (defun closest-point-on-triangle (vertices faces face point)
+  (check-type vertices vertex-array)
+  (check-type faces face-array)
+  (check-type face face)
   (let* ((v0 (v vertices (aref faces (+ 0 (* face 3)))))
          (e0 (nv- (v vertices (aref faces (+ 1 (* face 3)))) v0))
          (e1 (nv- (v vertices (aref faces (+ 2 (* face 3)))) v0))
@@ -266,7 +289,9 @@
       (nv+* (nv+* (v vertices (aref faces (* face 3))) e0 (clamp u)) e1 (clamp v)))))
 
 (defun face-in-volume-p (vertices faces face c e)
-  (declare (type (unsigned-byte 32) face))
+  (check-type vertices vertex-array)
+  (check-type faces face-array)
+  (check-type face face)
   (declare (type vec3 c e))
   ;; SAT
   (let* ((v0 (v vertices (aref faces (+ 0 (* face 3)))))
@@ -300,6 +325,8 @@
                     (v. n v0))))))))
 
 (defun faces-in-volume (vertices faces location bsize)
+  (check-type vertices vertex-array)
+  (check-type faces face-array)
   (let ((new-faces (make-array 0 :element-type '(unsigned-byte 32) :adjustable T :fill-pointer T)))
     (loop for face from 0 below (truncate (length faces) 3)
           for j from 0 by 3
@@ -310,6 +337,7 @@
     (make-array (length new-faces) :element-type '(unsigned-byte 32) :initial-contents new-faces)))
 
 (defun bounding-box (vertices)
+  (check-type vertices vertex-array)
   (let ((min (vec (aref vertices 0) (aref vertices 1) (aref vertices 2)))
         (max (vec (aref vertices 0) (aref vertices 1) (aref vertices 2))))
     (loop for i from 0 below (length vertices) by 3
@@ -326,6 +354,7 @@
       (values (nv+ min bsize) bsize))))
 
 (defun vertex-faces (faces &optional vertex-faces)
+  (check-type faces face-array)
   (let ((vertex-faces (or vertex-faces
                           (make-array (1+ (loop for vertex across faces maximize vertex))))))
     (dotimes (i (length vertex-faces))
@@ -334,7 +363,7 @@
       (vector-push-extend (truncate i 3) (aref vertex-faces (aref faces i))))))
 
 (defun 2-manifold-p (faces &optional adjacency)
-  (check-type faces (simple-array (unsigned-byte 32) (*)))
+  (check-type faces face-array)
   (let ((edge-table (make-hash-table :test 'eql)))
     (flet ((edge-twofaced-p (a b)
              (let ((edge (if (< a b)
@@ -364,6 +393,8 @@
                  always (edge-loop-p adjacency vertex))))))
 
 (defun separate-meshes (vertices faces)
+  (check-type vertices vertex-array)
+  (check-type faces face-array)
   (let ((mesh-count (make-array 0 :element-type '(unsigned-byte 32) :fill-pointer T :adjustable T))
         (vertex-mesh (make-array (truncate (length vertices) 3) :element-type '(unsigned-byte 32)
                                                                 :initial-element 0))

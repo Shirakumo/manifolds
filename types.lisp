@@ -1,7 +1,10 @@
 (in-package #:org.shirakumo.fraf.manifolds)
 
-(deftype vertex-array (&optional (element-type 'single-float))
-  `(simple-array ,element-type (*)))
+(deftype vertex-array (&optional element-type)
+  (if element-type
+      `(simple-array ,element-type (*))
+      `(or (simple-array single-float (*))
+           (simple-array double-float (*)))))
 
 (deftype face-array ()
   '(simple-array (unsigned-byte 32) (*)))
@@ -14,6 +17,12 @@
 
 (deftype f64 ()
   'double-float)
+
+(deftype vertex ()
+  '(integer 0 ,(truncate (1- (ash 1 32)) 3)))
+
+(deftype face ()
+  '(integer 0 ,(truncate (1- (ash 1 32)) 3)))
 
 (declaim (inline u32* u32 ensure-u32 f32* f32 ensure-f32 f64* f64 ensure-f64))
 
@@ -37,11 +46,12 @@
 (defun f32* (a)
   (float a 0f0))
 
-(declaim (ftype (function (&rest real) vertex-array) f32))
+(declaim (ftype (function (&rest real) (vertex-array single-float)) f32))
 (defun f32 (&rest i)
   (map-into (make-array (length i) :element-type 'single-float)
             #'f32* i))
 
+(declaim (ftype (function (vector) (vertex-array single-float)) f32))
 (defun ensure-f32 (a)
   (etypecase a
     ((simple-array single-float (*))
