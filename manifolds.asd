@@ -9,8 +9,10 @@
   :source-control (:git "https://github.com/shirakumo/manifolds.git")
   :serial T
   :components ((:file "package")
+               (:file "types")
                (:file "manifolds")
-               (:file "convert"))
+               (:file "convert")
+               (:file "documentation"))
   :depends-on (:3d-math
                :documentation-utils)
   :in-order-to ((asdf:test-op (asdf:test-op :manifolds-test))))

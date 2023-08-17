@@ -1,43 +1,5 @@
 (in-package #:org.shirakumo.fraf.manifolds)
 
-(declaim (inline u32 ensure-u32 f32* f32 ensure-f32 f64* f64 ensure-f64))
-
-(defun u32 (&rest i)
-  (make-array (length i) :element-type '(unsigned-byte 32) :initial-contents i))
-
-(defun ensure-u32 (a)
-  (etypecase a
-    ((simple-array (unsigned-byte 32) (*))
-     a)
-    (vector
-     (make-array (length a) :element-type '(unsigned-byte 32) :initial-contents a))))
-
-(defun f32* (a)
-  (float a 0f0))
-
-(defun f32 (&rest i)
-  (make-array (length i) :element-type 'single-float :initial-contents (mapcar #'float i)))
-
-(defun ensure-f32 (a)
-  (etypecase a
-    ((simple-array single-float (*))
-     a)
-    (vector
-     (make-array (length a) :element-type 'single-float :initial-contents a))))
-
-(defun f64* (a)
-  (float a 0d0))
-
-(defun f64 (&rest i)
-  (make-array (length i) :element-type 'double-float :initial-contents (mapcar #'float i)))
-
-(defun ensure-f64 (a)
-  (etypecase a
-    ((simple-array double-float (*))
-     a)
-    (vector
-     (make-array (length a) :element-type 'double-float :initial-contents a))))
-
 (defmacro do-faces ((a b c faces &optional result) &body body)
   (let ((i (gensym "I"))
         (f (gensym "F")))
