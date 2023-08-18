@@ -1,3 +1,11 @@
 # About Manifolds
-This library implements a variety of algorithms for querying and creating manifold triangle meshes.
+This library implements a variety of algorithms for querying and creating triangle meshes.
 
+Since this is a toolkit library, please refer to the symbol index for the available operations and what they do.
+
+Note that the library requires the following format for all mesh data:
+
+- Vertices are packed into a single array of a specialised element-type, either single- or double-float, with three consecutive elements describing one vertex.
+- Faces are triangular only and are also packed into a single array specialised on unsigned-byte 32, with three consecutive elements describing one face in counter-clockwise winding order. The indices are indices of a vertex. Meaning to reach the first element of the vertex in the corresponding vertex array, it must be multiplied by 3.
+
+This format is compact, efficient, and compatible with graphics APIs, allowing for easy sharing between libraries and making it convenient to display.

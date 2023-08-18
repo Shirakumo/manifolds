@@ -14,5 +14,6 @@
                (:file "convert")
                (:file "documentation"))
   :depends-on (:3d-math
+               :3d-spaces
                :documentation-utils)
   :in-order-to ((asdf:test-op (asdf:test-op :manifolds-test))))

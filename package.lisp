@@ -1,9 +1,20 @@
 (defpackage #:org.shirakumo.fraf.manifolds
   (:use #:cl #:org.shirakumo.fraf.math)
   (:export
+   #:vertex-array
+   #:face-array
+   #:vertex
+   #:face
    #:u32
    #:f32
    #:f64
+   #:ensure-u32
+   #:ensure-f32
+   #:ensure-f64
+   #:u32*
+   #:f32*
+   #:f64*)
+  (:export
    #:do-faces
    #:vertex-adjacency-list
    #:face-adjacency-list
@@ -24,4 +35,5 @@
    #:bounding-box
    #:vertex-faces
    #:2-manifold-p
-   #:separate-meshes))
+   #:separate-meshes
+   #:normalize))
