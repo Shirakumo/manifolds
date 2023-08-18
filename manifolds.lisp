@@ -289,7 +289,7 @@
       (nv+* (nv+* (v vertices (aref faces (* face 3))) e0 (clamp u)) e1 (clamp v)))))
 
 (defun face-in-volume-p (vertices faces face location bsize)
-  (declare (type vec3 c e))
+  (declare (type vec3 location bsize))
   (check-type vertices vertex-array)
   (check-type faces face-array)
   (check-type face face)
@@ -431,6 +431,13 @@
                  (vector-push-extend c mesh-faces)))
           collect (cons mesh-vertices (make-array (length mesh-faces) :element-type '(unsigned-byte 32) :initial-contents mesh-faces)))))
 
+(defstruct (vertex-index
+            (:include vec3)
+            (:constructor %make-vertex-index (varr3 index))
+            (:copier NIL)
+            (:predicate NIL))
+  (index 0 :type (unsigned-byte 32) :read-only T))
+
 (defun normalize (vertices indices &key (threshold 0.001) (center (vec 0 0 0)) (scale 1.0))
   ;; TODO: could probably do this inline by going over verts first, then faces and only copying once.
   (let ((tree (org.shirakumo.fraf.trial.space.kd-tree:make-kd-tree))
@@ -444,7 +451,7 @@
                      (T
                       (let ((index (truncate (length new-vertices) 3)))
                         (org.shirakumo.fraf.trial.space.kd-tree:kd-tree-insert
-                         (make-vertex-index (vx p) (vy p) (vz p) index) tree)
+                         (%make-vertex-index (varr3 p) index) tree)
                         (vector-push-extend (float (vx p) 0d0) new-vertices)
                         (vector-push-extend (float (vy p) 0d0) new-vertices)
                         (vector-push-extend (float (vz p) 0d0) new-vertices)
