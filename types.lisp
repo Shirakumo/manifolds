@@ -19,10 +19,10 @@
   'double-float)
 
 (deftype vertex ()
-  '(integer 0 ,(truncate (1- (ash 1 32)) 3)))
+  `(integer 0 ,(truncate (1- (ash 1 32)) 3)))
 
 (deftype face ()
-  '(integer 0 ,(truncate (1- (ash 1 32)) 3)))
+  `(integer 0 ,(truncate (1- (ash 1 32)) 3)))
 
 (declaim (inline u32* u32 ensure-u32 f32* f32 ensure-f32 f64* f64 ensure-f64))
 

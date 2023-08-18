@@ -289,10 +289,10 @@
       (nv+* (nv+* (v vertices (aref faces (* face 3))) e0 (clamp u)) e1 (clamp v)))))
 
 (defun face-in-volume-p (vertices faces face c e)
+  (declare (type vec3 c e))
   (check-type vertices vertex-array)
   (check-type faces face-array)
   (check-type face face)
-  (declare (type vec3 c e))
   ;; SAT
   (let* ((v0 (v vertices (aref faces (+ 0 (* face 3)))))
          (v1 (v vertices (aref faces (+ 1 (* face 3)))))
