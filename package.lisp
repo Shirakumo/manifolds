@@ -30,6 +30,7 @@
    #:centroid
    #:convex-volume
    #:closest-point-on-triangle
+   #:ray-triangle
    #:face-in-volume-p
    #:faces-in-volume
    #:bounding-box
