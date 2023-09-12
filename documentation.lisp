@@ -168,9 +168,12 @@ FACES must be a FACE-ARRAY.
 
 See FACE-ARRAY (type)
 See HALF-EDGE-LIST")
-  
+
   (function boundary-list
     "Returns a vector of edges on the boundary of the faces.
+
+Each entry in the resulting vector is one edge described by a cons
+with the CAR and CDR being vertex indices.
 
 Note that this requires that the FACES describe one coherent shape
 with only one outside edge. It does not consider multiple edge loops
