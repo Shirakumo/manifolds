@@ -78,7 +78,7 @@
   (let ((edge-table (make-hash-table :test 'eql))
         (edges (make-array 0 :element-type 'cons :adjustable T :fill-pointer T)))
     (flet ((edge (a b)
-             (if (< a b) 
+             (if (< a b)
                  (pushnew b (gethash a edge-table))
                  (pushnew a (gethash b edge-table)))))
       (do-faces (a b c faces)
@@ -95,18 +95,20 @@
   (let ((edge-table (make-hash-table :test 'eql))
         (edges (make-array 0 :element-type 'cons :adjustable T :fill-pointer T)))
     (flet ((edge (a b)
-             (let ((edge (+ (ash a 32) b))
-                   (rev-edge (+ b (ash a 32))))
-               ;; If we already recorded the reverse edge, remove both
-               ;; as they cannot be on the boundary.
-               (if (gethash rev-edge edge-table)
-                   (remhash rev-edge edge-table)
-                   (setf (gethash edge edge-table) (cons a b))))))
+             (let ((edge     (+ (ash a 32) b))
+                   (rev-edge (+ (ash b 32) a)))
+               ;; If we already recorded the reverse edge, omit both
+               ;; edges from the result as they cannot be on the
+               ;; boundary.
+               (cond ((gethash rev-edge edge-table)
+                      (remhash rev-edge edge-table))
+                     (t
+                      (setf (gethash edge edge-table) (cons a b)))))))
       (do-faces (a b c faces)
         (edge a b)
         (edge b c)
         (edge c a))
-      (loop for edge being the hash-keys of edge-table
+      (loop for edge being the hash-values of edge-table
             do (vector-push-extend edge edges))
       edges)))
 
