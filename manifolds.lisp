@@ -198,7 +198,7 @@
 (defun boundary-length (vertices faces)
   (check-type vertices vertex-array)
   (check-type faces face-array)
-  (loop for (a b) across (boundary-list faces)
+  (loop for (a . b) across (boundary-list faces)
         sum (vdistance (v vertices a) (v vertices b))))
 
 (defun centroid (vertices faces)
