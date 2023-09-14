@@ -53,7 +53,7 @@
   (map-into (make-array (length i) :element-type 'single-float)
             #'f32 i))
 
-(declaim (ftype (function (vector) (vertex-array single-float)) f32))
+(declaim (ftype (function (vector) (vertex-array single-float)) ensure-f32))
 (defun ensure-f32 (a)
   (etypecase a
     ((simple-array single-float (*))
@@ -71,7 +71,7 @@
   (map-into (make-array (length i) :element-type 'double-float)
             #'f64 i))
 
-(declaim (ftype (function (vector) (vertex-array double-float)) f64))
+(declaim (ftype (function (vector) (vertex-array double-float)) ensure-f64))
 (defun ensure-f64 (a)
   (etypecase a
     ((simple-array double-float (*))
