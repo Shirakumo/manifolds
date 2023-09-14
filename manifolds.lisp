@@ -76,24 +76,28 @@
 (defun edge-list (faces)
   (check-type faces face-array)
   (let ((edge-table (make-hash-table :test 'eql))
-        (edges (make-array 0 :element-type 'edge :adjustable T :fill-pointer T)))
+        (edge-count 0))
     (flet ((add-edge (a b)
+             (incf edge-count)
              (if (< a b)
                  (pushnew b (gethash a edge-table))
                  (pushnew a (gethash b edge-table)))))
       (do-faces (a b c faces)
         (add-edge a b)
         (add-edge b c)
-        (add-edge c a))
-      (loop for a being the hash-keys of edge-table using (hash-value bs)
-            do (dolist (b bs)
-                 (vector-push-extend (edge a b) edges)))
-      edges)))
+        (add-edge c a)))
+    (loop with edges = (make-array edge-count)
+          for i = 0
+          for a being the hash-keys of edge-table using (hash-value bs)
+          do (dolist (b bs)
+               (setf (aref edges i) (edge a b))
+               (incf i))
+          finally (return edges))))
 
 (defun boundary-list (faces)
   (check-type faces face-array)
   (let ((edge-table (make-hash-table :test 'eql))
-        (edges (make-array 0 :element-type 'edge :adjustable T :fill-pointer T)))
+        (edge-count 0))
     (flet ((add-edge (a b c)
              (multiple-value-bind (edge flippedp)
                  (if (< b a)
@@ -101,25 +105,34 @@
                      (values (+ (ash a 32) b) nil))
                (setf (gethash edge edge-table)
                      (case (gethash edge edge-table)
-                       (:inner :inner)
-                       ((nil)
+                       (:inner :inner) ; > 2 incident faces
+                       ((nil) ; first incident face
+                        (incf edge-count)
+                        ;; Store index of third vertex and encode
+                        ;; winding direction in sign.
                         (if flippedp (- c) c))
-                       (t
+                       (t ; second incident face
+                        (decf edge-count)
                         :inner))))))
       (do-faces (a b c faces)
         (add-edge a b c)
         (add-edge b c a)
         (add-edge c a b)))
-    (loop for edge being the hash-keys of edge-table using (hash-value info)
+    (loop with edges = (make-array edge-count)
+          with i = 0
+          for edge being the hash-keys of edge-table using (hash-value info)
           unless (eq info :inner)
-          do (let* ((flippedp (minusp info))
-                    (a (ldb (byte 32 32) edge))
-                    (b (ldb (byte 32 0) edge))
-                    (edge (if flippedp
-                              (extended-edge b a (- info))
-                              (extended-edge a b info))))
-               (vector-push-extend edge edges)))
-    edges))
+            do (let* ((flippedp (minusp info))
+                      (a (ldb (byte 32 32) edge))
+                      (b (ldb (byte 32 0) edge))
+                      ;; Restore winding direction and index of third
+                      ;; vertex.
+                      (edge (if flippedp
+                                (extended-edge b a (- info))
+                                (extended-edge a b info))))
+                 (setf (aref edges i) edge)
+                 (incf i))
+          finally (return edges))))
 
 (declaim (inline v (setf v) sbitp (setf sbitp)))
 (defun v (vertices i)
