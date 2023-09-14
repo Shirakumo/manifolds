@@ -173,9 +173,11 @@ See HALF-EDGE-LIST")
   (function boundary-list
     "Returns a vector of edges on the boundary of the faces.
 
-Each entry in the resulting vector is one edge described by an EDGE
-instance with the START and END slots being vertex indices. Note that
-the actual direction of the edge is not indicated.
+Each entry in the resulting vector is one edge described by an
+EXTENDED-EDGE instance with the START and END slots being vertex
+indices, and the edge pointing from the START to the END. The OPPOSITE
+slot contains the index of the third vertex of the face to which the
+edge indicated by START and END belongs.
 
 Note that this requires that the FACES describe one coherent shape
 with only one outside edge. It does not consider multiple edge loops
