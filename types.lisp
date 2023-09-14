@@ -24,6 +24,24 @@
 (deftype face ()
   `(integer 0 ,(truncate (1- (ash 1 32)) 3)))
 
+(declaim (inline edge extended-edge))
+
+(defstruct (edge
+            (:constructor edge (start end))
+            (:conc-name nil)
+            (:predicate nil)
+            (:copier nil))
+  (start (error "required") :type vertex)
+  (end (error "required") :type vertex))
+
+(defstruct (extended-edge
+            (:include edge)
+            (:constructor extended-edge (start end opposite))
+            (:conc-name nil)
+            (:predicate nil)
+            (:copier nil))
+  (opposite (error "required") :type vertex))
+
 (declaim (inline u32* u32 ensure-u32 f32* f32 ensure-f32 f64* f64 ensure-f64))
 
 (declaim (ftype (function (real) u32) u32))

@@ -5,6 +5,11 @@
    #:face-array
    #:vertex
    #:face
+   #:edge
+   #:start
+   #:end
+   #:extended-edge
+   #:opposite
    #:u32
    #:f32
    #:f64
