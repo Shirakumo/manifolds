@@ -147,9 +147,9 @@ See FACE-ARRAY (type)")
     "Returns a vector of half edges for the described faces.
 
 A half-edge is a directed edge from one vertex of a face to
-another. Each entry in the array represents a half-edge and contains a
-cons with the CAR and CDR each being vertex indices, with the edge
-pointing from the CAR to the CDR.
+another. Each entry in the array represents a half-edge and contains
+an EDGE instance with the START and END slots each being vertex
+indices, and the edge pointing from the START to the END.
 
 FACES must be a FACE-ARRAY.
 
@@ -161,8 +161,9 @@ See EDGE-LIST")
 
 Unlike the half-edge-list, this edge-list does not contain any
 duplicated edges between any two vertices. Each entry in the resulting
-vector is one edge described by a cons with the CAR and CDR being
-vertex indices.
+vector is one edge described by an EDGE instance with the START and
+END slots being vertex indices. Note that the actual direction of the
+edge is not indicated.
 
 FACES must be a FACE-ARRAY.
 
@@ -172,8 +173,9 @@ See HALF-EDGE-LIST")
   (function boundary-list
     "Returns a vector of edges on the boundary of the faces.
 
-Each entry in the resulting vector is one edge described by a cons
-with the CAR and CDR being vertex indices.
+Each entry in the resulting vector is one edge described by an EDGE
+instance with the START and END slots being vertex indices. Note that
+the actual direction of the edge is not indicated.
 
 Note that this requires that the FACES describe one coherent shape
 with only one outside edge. It does not consider multiple edge loops
