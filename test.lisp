@@ -39,7 +39,6 @@
 
   (let* ((mesh (load-mesh "boundary-2"))
          (boundary-list (boundary-list (wavefront:index-data mesh))))
-    (print boundary-list)
     (is eql 8 (length boundary-list))
     (map nil (lambda (element)
                (of-type 'extended-edge element))
