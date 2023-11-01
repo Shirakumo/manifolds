@@ -487,11 +487,19 @@
             (:predicate NIL))
   (index 0 :type (unsigned-byte 32) :read-only T))
 
+(defmethod org.shirakumo.fraf.trial.space:location ((object vertex-index))
+  object)
+
+(defmethod org.shirakumo.fraf.trial.space:bsize ((object vertex-index))
+  (vec 0 0 0))
+
 (defun normalize (vertices indices &key (threshold 0.001) (center (vec 0 0 0)) (scale 1.0))
+  (check-type vertices vertex-array)
+  (check-type indices face-array)
   ;; TODO: could probably do this inline by going over verts first, then faces and only copying once.
   (let ((tree (org.shirakumo.fraf.trial.space.kd-tree:make-kd-tree))
-        (new-vertices (make-array 0 :element-type 'double-float :adjustable T :fill-pointer T))
-        (new-indices (make-array 0 :element-type '(unsigned-byte 32) :adjustable T :fill-pointer T)))
+        (new-vertices (make-array 0 :element-type 'single-float :adjustable T :fill-pointer T))
+        (new-indices (make-array 0 :element-type 'u32 :adjustable T :fill-pointer T)))
     (flet ((vertex-idx (p)
              (let* ((p (nv* (nv- p center) scale))
                     (nearest (org.shirakumo.fraf.trial.space.kd-tree:kd-tree-nearest p tree :max-radius threshold)))
@@ -501,9 +509,9 @@
                       (let ((index (truncate (length new-vertices) 3)))
                         (org.shirakumo.fraf.trial.space.kd-tree:kd-tree-insert
                          (%make-vertex-index (varr3 p) index) tree)
-                        (vector-push-extend (float (vx p) 0d0) new-vertices)
-                        (vector-push-extend (float (vy p) 0d0) new-vertices)
-                        (vector-push-extend (float (vz p) 0d0) new-vertices)
+                        (vector-push-extend (float (vx p) 0f0) new-vertices)
+                        (vector-push-extend (float (vy p) 0f0) new-vertices)
+                        (vector-push-extend (float (vz p) 0f0) new-vertices)
                         index))))))
       (loop for i from 0 below (length indices) by 3
             for p1 = (v vertices (aref indices (+ i 0)))
@@ -516,5 +524,5 @@
                  (vector-push-extend i1 new-indices)
                  (vector-push-extend i2 new-indices)
                  (vector-push-extend i3 new-indices))))
-    (values (replace (make-array (length new-vertices) :element-type 'double-float) new-vertices)
-            (replace (make-array (length new-indices) :element-type '(unsigned-byte 32)) new-indices))))
+    (values (replace (make-array (length new-vertices) :element-type 'single-float) new-vertices)
+            (replace (make-array (length new-indices) :element-type 'u32) new-indices))))
