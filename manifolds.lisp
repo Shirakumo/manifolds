@@ -373,6 +373,12 @@
                        (* (vz bsize) (abs (vz n))))
                     (v. n v0))))))))
 
+(defun intersects-volume-p (vertices faces location bsize)
+  ;; FIXME: check if bsize entirely within mesh
+  (dotimes (face (truncate faces 3) NIL)
+    (when (face-in-volume-p vertices faces face location bsize)
+      (return T))))
+
 (defun faces-in-volume (vertices faces location bsize)
   (check-type vertices vertex-array)
   (check-type faces face-array)
@@ -558,3 +564,36 @@
                       (aref vertices (+ i 1)) (vy v)
                       (aref vertices (+ i 2)) (vz v))))))
   vertices)
+
+(defun voxelize (vertices faces &key (grid 1.0))
+  (multiple-value-bind (center bsize) (bounding-box vertices)
+    (let ((grid (etypecase grid
+                  ((integer 1)
+                   (make-array (list grid grid grid) :element-type 'bit))
+                  (single-float
+                   (make-array (list (ceiling (/ (* 2 (vz bsize)) grid))
+                                     (ceiling (/ (* 2 (vy bsize)) grid))
+                                     (ceiling (/ (* 2 (vx bsize)) grid)))
+                               :element-type 'bit))
+                  (list
+                   (destructuring-bind (x y z) grid
+                     (make-array (list z y x) :element-type 'bit)))
+                  ((simple-array boolean (* * *))
+                   grid))))
+      (destructuring-bind (vd vh vw) (array-dimensions grid)
+        (let ((s (vec (/ (vz bsize) vd)
+                      (/ (vy bsize) vh)
+                      (/ (vx bsize) vw)))
+              (c (v- center bsize)))
+          ;; Compute the shell
+          (dotimes (i vd)
+            (dotimes (j vh)
+              (dotimes (k vw)
+                ;; FIXME: this is obviously horribly inefficient
+                (setf (aref grid i j k) (intersects-volume-p vertices faces c s))
+                (incf (vx c) (vx s)))
+              (setf (vx c) (- (vx center) (vx bsize)))
+              (incf (vy c) (vy s)))
+            (setf (vy c) (- (vy center) (vy bsize)))
+            (incf (vz c) (vz s)))
+          (values grid center bsize))))))

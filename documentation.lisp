@@ -293,6 +293,19 @@ See FACES-IN-VOLUME
 See FACE (type)
 See VERTEX-ARRAY (type)
 See FACE-ARRAY (type)")
+
+  (function intersects-volume-p
+    "Returns whether the mesh intersects the AABB described by LOCATION and BSIZE.
+
+LOCATION should be the center of the AABB, and BSIZE the half-size
+extent of the AABB.
+
+FACES must be a FACE-ARRAY.
+VERTICES must be a VERTEX-ARRAY.
+
+See FACE-IN-VOLUME-P
+See VERTEX-ARRAY (type)
+See FACE-ARRAY (type)")
   
   (function faces-in-volume
     "Returns a vector of all faces that are part of the AABB described by LOCATION and BSIZE.
@@ -369,4 +382,29 @@ Returns the modified vertex array.
 
 See VERTEX-ARRAY (type)
 See 3D-MATH:MAT
-See 3D-MATH:DMAT"))
+See 3D-MATH:DMAT")
+
+  (function voxelize
+    "Creates a voxel representation of the given mesh.
+
+If FILL-INSIDES is T, the mesh is treated as a filled volume,
+otherwise as a hollow shell.
+
+GRID may be one of the following:
+  INTEGER      --- The resolution in each dimension
+  SINGLE-FLOAT --- The approximate size of a voxel cube
+  (X Y Z)      --- The resolution of the voxel grid in each dimension
+  ARRAY        --- The voxel grid to use. Must be a 3D SIMPLE-ARRAY
+                   of element-type BIT.
+
+Returns the voxel grid, which is a 3-d array with the indices being
+DEPTH HEIGHT WIDTH, in that order. Each element is a BIT where 0 means
+empty space and 1 means occupied.
+
+The grid is normalised to be centred around the mesh's centroid and
+scaled according to its bounding size, which are returned as secondary
+values.
+
+See INTERSECTS-VOLUME-P
+See VERTEX-ARRAY (type)
+See FACE-ARRAY (type)"))
