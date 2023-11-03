@@ -27,6 +27,7 @@
    #:edge-list
    #:boundary-list
    #:v
+   #:vertex-normal
    #:face-normal
    #:face-normals
    #:face-area
@@ -38,9 +39,11 @@
    #:ray-triangle
    #:face-in-volume-p
    #:faces-in-volume
+   #:intersects-volume-p
    #:bounding-box
    #:vertex-faces
    #:2-manifold-p
    #:separate-meshes
    #:normalize
-   #:transform-mesh))
+   #:transform-mesh
+   #:voxelize))

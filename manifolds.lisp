@@ -170,6 +170,24 @@
 (defun (setf sbitp) (value array i)
   (setf (sbit array i) (if value 1 0)))
 
+(defun vertex-normal (vertices vertex adjacents)
+  (check-type vertices vertex-array)
+  (check-type vertex vertex)
+  (check-type adjacents list)
+  (let ((normal (vec3))
+        (count 0))
+    (flet ((normal (v1 v2)
+             (let* ((a (v vertices vertex))
+                    (b (v vertices v1))
+                    (c (v vertices v2)))
+               (incf count)
+               (nvunit (vc (v- b a) (v- c a))))))
+      (loop for (a b) on adjacents
+            do (if b
+                   (nv+ normal (normal a b))
+                   (nv+ normal (normal a (first adjacents)))))
+      (nv* normal (/ count)))))
+
 (defun face-normal (vertices faces face)
   (check-type vertices vertex-array)
   (check-type faces face-array)

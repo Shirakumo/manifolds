@@ -195,7 +195,17 @@ The vector matches the element-type of the vertices array.
 VERTICES must be a VERTEX-ARRAY.
 
 See VERTEX-ARRAY (type)")
-  
+ 
+  (function vertex-normal
+    "Returns the normal vector of the VERTEX with ADJACENTS.
+
+You can obtain the ADJACENTS list via VERTEX-ADJACENCY-LIST.
+The normal is \"smooth\" based on the surrounding adjacent vertices.
+
+see VERTEX-ARRAY (type)
+See VERTEX (type)
+See VERTEX-ADJACENCY-LIST")
+ 
   (function face-normal
     "Returns the normal vector of the FACE.
 
