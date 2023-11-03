@@ -534,3 +534,27 @@
     (etypecase (aref vertices 0)
       (single-float (compute single-float))
       (double-float (compute double-float)))))
+
+(defun transform-mesh (vertices matrix)
+  (etypecase vertices
+    ((vertex-array f32)
+     (loop for i from 0 below (length vertices) by 3
+           do (let ((v (vec (aref vertices (+ i 0))
+                            (aref vertices (+ i 1))
+                            (aref vertices (+ i 2)))))
+                (declare (dynamic-extent v))
+                (n*m matrix v)
+                (setf (aref vertices (+ i 0)) (vx v)
+                      (aref vertices (+ i 1)) (vy v)
+                      (aref vertices (+ i 2)) (vz v)))))
+    ((vertex-array f64)
+     (loop for i from 0 below (length vertices) by 3
+           do (let ((v (dvec (aref vertices (+ i 0))
+                             (aref vertices (+ i 1))
+                             (aref vertices (+ i 2)))))
+                (declare (dynamic-extent v))
+                (n*m matrix v)
+                (setf (aref vertices (+ i 0)) (vx v)
+                      (aref vertices (+ i 1)) (vy v)
+                      (aref vertices (+ i 2)) (vz v))))))
+  vertices)

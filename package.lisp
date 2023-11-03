@@ -42,4 +42,5 @@
    #:vertex-faces
    #:2-manifold-p
    #:separate-meshes
-   #:normalize))
+   #:normalize
+   #:transform-mesh))

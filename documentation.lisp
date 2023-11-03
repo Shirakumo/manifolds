@@ -360,4 +360,13 @@ FACES must be a FACE-ARRAY.
 VERTICES must be a VERTEX-ARRAY.
 
 See VERTEX-ARRAY (type)
-See FACE-ARRAY (type)"))
+See FACE-ARRAY (type)")
+
+  (function transform-mesh
+    "Transforms all vertices of the mesh by the given transform matrix.
+
+Returns the modified vertex array.
+
+See VERTEX-ARRAY (type)
+See 3D-MATH:MAT
+See 3D-MATH:DMAT"))
