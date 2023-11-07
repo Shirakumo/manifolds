@@ -12,6 +12,7 @@
                (:file "types")
                (:file "manifolds")
                (:file "convert")
+               (:file "miniball")
                (:file "documentation"))
   :depends-on (:3d-math
                :3d-spaces

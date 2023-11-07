@@ -46,4 +46,5 @@
    #:separate-meshes
    #:normalize
    #:transform-mesh
-   #:voxelize))
+   #:voxelize
+   #:bounding-sphere))

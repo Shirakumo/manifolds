@@ -417,4 +417,11 @@ values.
 
 See INTERSECTS-VOLUME-P
 See VERTEX-ARRAY (type)
-See FACE-ARRAY (type)"))
+See FACE-ARRAY (type)")
+
+  (function bounding-sphere
+    "Computes a tight bounding sphere encapsulating the set of vertices.
+
+Returns two values, the center of the sphere as a VEC3 and its radius.
+
+See VERTEX-ARRAY (type)"))
