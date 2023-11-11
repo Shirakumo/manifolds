@@ -25,10 +25,30 @@
     (assert (= (wavefront:face-length (first meshes)) 3))
     (first meshes)))
 
+(defun vertex-array (component-type components)
+  (map-into (make-array (length components) :element-type component-type)
+            (lambda (value) (coerce value component-type))
+            components))
+
+(defun face-array (indices)
+  (make-array 3 :element-type 'u32 :initial-contents indices))
+
 (define-test edge-list.smoke
   (let* ((mesh (load-mesh "box"))
          (edge-list (edge-list (wavefront:index-data mesh))))
     (is eql 18 (length edge-list))))
+
+(define-test face-area.smoke
+  (flet ((test (vertex-component-type)
+           (let* ((vertices (vertex-array
+                             vertex-component-type
+                             '(0 0 0 0 1 0 1 0 0)))
+                  (faces (face-array '(0 1 2)))
+                  (area (face-area vertices faces 0)))
+             (true (typep area vertex-component-type))
+             (is = (coerce 1/2 vertex-component-type) area))))
+    (test 'single-float)
+    (test 'double-float)))
 
 (define-test boundary-list.smoke
   (let* ((mesh (load-mesh "box"))
@@ -51,11 +71,9 @@
 
 (define-test normalize.smoke
   (flet ((test (vertex-component-type)
-           (let* ((vertices '(0 0 0 1 0 0 0 1 0))
-                  (vertices (map-into (make-array (length vertices) :element-type vertex-component-type)
-                                      (lambda (value) (coerce value vertex-component-type))
-                                      vertices))
-                  (faces    (make-array 3 :element-type 'u32 :initial-contents '(0 1 2))))
+           (let* ((vertices (vertex-array vertex-component-type
+                                          '(0 0 0 1 0 0 0 1 0)))
+                  (faces    (face-array '(0 1 2))))
              (multiple-value-bind (result-vertices result-faces)
                  (normalize vertices faces)
                (true (typep result-vertices 'vertex-array))
