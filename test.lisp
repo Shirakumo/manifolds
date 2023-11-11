@@ -25,6 +25,11 @@
     (assert (= (wavefront:face-length (first meshes)) 3))
     (first meshes)))
 
+(define-test edge-list.smoke
+  (let* ((mesh (load-mesh "box"))
+         (edge-list (edge-list (wavefront:index-data mesh))))
+    (is eql 18 (length edge-list))))
+
 (define-test boundary-list.smoke
   (let* ((mesh (load-mesh "box"))
          (boundary-list (boundary-list (wavefront:index-data mesh))))
