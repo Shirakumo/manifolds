@@ -10,12 +10,15 @@
    #:end
    #:extended-edge
    #:opposite
+   #:u16
    #:u32
    #:f32
    #:f64
+   #:ensure-u16
    #:ensure-u32
    #:ensure-f32
    #:ensure-f64
+   #:u16*
    #:u32*
    #:f32*
    #:f64*)

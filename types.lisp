@@ -6,8 +6,14 @@
       `(or (simple-array single-float (*))
            (simple-array double-float (*)))))
 
-(deftype face-array ()
-  '(simple-array (unsigned-byte 32) (*)))
+(deftype face-array (&optional element-type)
+  (if element-type
+      `(simple-array ,element-type (*))
+      `(or (simple-array (unsigned-byte 32) (*))
+           (simple-array (unsigned-byte 16) (*)))))
+
+(deftype u16 ()
+  '(unsigned-byte 16))
 
 (deftype u32 ()
   '(unsigned-byte 32))
@@ -42,7 +48,25 @@
             (:copier nil))
   (opposite (error "required") :type vertex))
 
-(declaim (inline u32* u32 ensure-u32 f32* f32 ensure-f32 f64* f64 ensure-f64))
+(declaim (inline u16* u16 ensure-u16 u32* u32 ensure-u32 f32* f32 ensure-f32 f64* f64 ensure-f64))
+
+(declaim (ftype (function (real) u16) u16))
+(defun u16 (a)
+  (ldb (byte 16 0) (truncate a)))
+
+(declaim (ftype (function (&rest real) face-array) u16*))
+(defun u16* (&rest i)
+  (map-into (make-array (length i) :element-type '(unsigned-byte 16))
+            #'u16 i))
+
+(declaim (ftype (function (vector) face-array) ensure-u16))
+(defun ensure-u16 (a)
+  (etypecase a
+    ((simple-array (unsigned-byte 16) (*))
+     a)
+    (vector
+     (map-into (make-array (length a) :element-type '(unsigned-byte 16))
+               #'u16 a))))
 
 (declaim (ftype (function (real) u32) u32))
 (defun u32 (a)
