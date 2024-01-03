@@ -33,6 +33,7 @@
    #:vertex-normal
    #:face-normal
    #:face-normals
+   #:triangle-area
    #:face-area
    #:surface-area
    #:boundary-length

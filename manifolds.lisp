@@ -220,6 +220,17 @@
   (dotimes (i (length face-normals) face-normals)
     (setf (aref face-normals i) (face-normal* vertices faces i))))
 
+(declaim (inline triangle-area))
+(defun triangle-area (p1 p2 p3)
+  (let* ((p2-p1 (v- p2 p1))
+         (base (v2norm p2-p1)))
+    (declare (dynamic-extent p2-p1))
+    (if (= 0 base)
+        base
+        (let ((p3-p1 (v- p3 p1)))
+          (declare (dynamic-extent p3-p1))
+          (* 0.5 base (v2norm (nv- p3-p1 (nv* p2-p1 (/ (v. p3-p1 p2-p1) (* base base))))))))))
+
 (defun face-area (vertices faces face)
   (check-type vertices vertex-array)
   (check-type faces face-array)
