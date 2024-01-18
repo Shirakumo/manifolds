@@ -121,3 +121,10 @@
     (vector
      (map-into (make-array (length a) :element-type 'double-float)
                #'f64 a))))
+
+(defmacro with-vertex-specialization ((var) &body body)
+  `(etypecase ,var
+     ((vertex-array single-float)
+      ,@body)
+     ((vertex-array double-float)
+      ,@body)))
