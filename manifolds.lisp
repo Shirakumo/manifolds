@@ -591,7 +591,7 @@
                                  (vector-push-extend i2 new-indices)
                                  (vector-push-extend i3 new-indices))))
                     (values (replace (make-array (length new-vertices) :element-type ',vertex-component-type) new-vertices)
-                            (replace (make-array (length new-indices) :element-type 'u32) new-indices))))))
+                            (replace (make-array (length new-indices) :element-type (array-element-type indices)) new-indices))))))
     (etypecase (aref vertices 0)
       (single-float (compute single-float))
       (double-float (compute double-float)))))
