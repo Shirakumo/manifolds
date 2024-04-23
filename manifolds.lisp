@@ -303,23 +303,26 @@
       (single-float (compute f32 vec))
       (double-float (compute f64 dvec)))))
 
-(defun convex-volume (vertices faces)
+;;; Algorithm described in “Efficient feature extraction for 2D/3D
+;;; objects in mesh representation” by Cha Zhang and Tsuhan Chen (2001) [1,2].
+;;;
+;;; [1]: https://doi.org/10.1109/ICIP.2001.958278
+;;; [2]: http://chenlab.ece.cornell.edu/Publication/Cha/icip01_Cha.pdf
+(defun volume (vertices faces)
   (check-type vertices vertex-array)
   (check-type faces face-array)
-  (let ((bary (vec3)))
-    (loop for i from 0 below (length vertices) by 3
-          do (incf (vx bary) (aref vertices (+ i 0)))
-             (incf (vy bary) (aref vertices (+ i 1)))
-             (incf (vz bary) (aref vertices (+ i 2))))
-    (nv/ bary (truncate (length vertices) 3))
-    (flet ((volume4 (a b c d)
-             (v. (v- a d) (vc (v- b d) (v- c d)))))
-      (/ (loop for i from 0 below (length faces) by 3
-               sum (volume4 (v vertices (aref faces (+ i 0)))
-                            (v vertices (aref faces (+ i 1)))
-                            (v vertices (aref faces (+ i 2)))
-                            bary))
-         6.0))))
+  (with-vertex-specialization (vertices)
+    (/ (loop for i from 0 below (length faces) by 3
+             for p1 = (v vertices (aref faces (+ 0 i)))
+             for p2 = (v vertices (aref faces (+ 1 i)))
+             for p3 = (v vertices (aref faces (+ 2 i)))
+             sum (+ (- (* (vx p3) (vy p2) (vz p1)))
+                    (+ (* (vx p2) (vy p3) (vz p1)))
+                    (+ (* (vx p3) (vy p1) (vz p2)))
+                    (- (* (vx p1) (vy p3) (vz p2)))
+                    (- (* (vx p2) (vy p1) (vz p3)))
+                    (+ (* (vx p1) (vy p2) (vz p3)))))
+       6)))
 
 (defun closest-point-on-triangle (vertices faces face point)
   (check-type vertices vertex-array)

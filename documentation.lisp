@@ -266,11 +266,8 @@ VERTICES must be a VERTEX-ARRAY.
 See VERTEX-ARRAY (type)
 See FACE-ARRAY (type)")
   
-  (function convex-volume
+  (function volume
     "Returns the volume of the mesh.
-
-The mesh must be convex. If it is concave, the result will not be
-accurate and may fail to compute.
 
 FACES must be a FACE-ARRAY.
 VERTICES must be a VERTEX-ARRAY.
