@@ -38,7 +38,7 @@
    #:surface-area
    #:boundary-length
    #:centroid
-   #:convex-volume
+   #:volume
    #:closest-point-on-triangle
    #:ray-triangle
    #:face-in-volume-p
