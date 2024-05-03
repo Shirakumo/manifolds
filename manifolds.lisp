@@ -633,7 +633,7 @@
                   (list
                    (destructuring-bind (x y z) grid
                      (make-array (list z y x) :element-type 'bit)))
-                  ((simple-array boolean (* * *))
+                  ((simple-array bit (* * *))
                    grid))))
       (destructuring-bind (vd vh vw) (array-dimensions grid)
         (let ((s (vec (/ (vz bsize) vd)
@@ -645,7 +645,7 @@
             (dotimes (j vh)
               (dotimes (k vw)
                 ;; FIXME: this is obviously horribly inefficient
-                (setf (aref grid i j k) (intersects-volume-p vertices faces c s))
+                (setf (aref grid i j k) (if (intersects-volume-p vertices faces c s) 1 0))
                 (incf (vx c) (vx s)))
               (setf (vx c) (- (vx center) (vx bsize)))
               (incf (vy c) (vy s)))
