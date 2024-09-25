@@ -378,6 +378,11 @@ The THRESHOLD is the distance threshold below which two vertices are
 considered the same. You may also optionally pass in a CENTER and
 SCALE to which the resulting vertices are positioned and scaled prior
 to normalisation.
+The ANGLE-THRESHOLD is a separate parameter to determine how obtuse an
+angle should be for a face to be considered to have no relevant
+surface and be removed. This may introduce tiny holes and make the
+meshes no longer manifold. To keep all triangles, set this parameter
+to zero.
 
 FACES must be a FACE-ARRAY.
 VERTICES must be a VERTEX-ARRAY.

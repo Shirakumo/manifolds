@@ -554,7 +554,7 @@
 (defmethod org.shirakumo.fraf.trial.space:bsize ((object vertex-index))
   (vec 0 0 0))
 
-(defun normalize (vertices indices &key (threshold 0.001) (center (vec 0 0 0)) (scale 1.0))
+(defun normalize (vertices indices &key (threshold 0.001) (center (vec 0 0 0)) (scale 1.0) (angle-threshold 0.001))
   (check-type vertices vertex-array)
   (check-type indices face-array)
   ;; TODO: could probably do this inline by going over verts first, then faces and only copying once.
@@ -586,7 +586,8 @@
                             for i1 = (vertex-idx p1)
                             for i2 = (vertex-idx p2)
                             for i3 = (vertex-idx p3)
-                            do (unless (or (= i1 i2) (= i1 i3) (= i2 i3))
+                            do (unless (or (= i1 i2) (= i1 i3) (= i2 i3)
+                                           (< (vsqrlength (vc (v- p2 p1) (v- p2 p3))) angle-threshold))
                                  (vector-push-extend i1 new-indices)
                                  (vector-push-extend i2 new-indices)
                                  (vector-push-extend i3 new-indices))))
