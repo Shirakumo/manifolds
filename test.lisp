@@ -1,5 +1,6 @@
 (defpackage #:org.shirakumo.fraf.manifolds.test
   (:nicknames #:manifolds-test)
+  (:import-from #:org.shirakumo.fraf.math.internal #:~=)
   (:use
    #:cl
    #:parachute
@@ -95,15 +96,15 @@
     (v= (vec 1 0 0))
     (= 0))
   (is-values (bounding-sphere (f32* 1 0 0 -1 0 0))
-    (v= (vec 0 0 0))
-    (= 1))
+    (v~= (vec 0 0 0))
+    (~= 1))
   (is-values (bounding-sphere (f32* 1 2 3 -1 2 3))
-    (v= (vec 0 2 3))
-    (= 1))
+    (v~= (vec 0 2 3))
+    (~= 1))
   (is-values (bounding-sphere (f32* +1 +1 0  -1 +1 0  +1 -1 0  -1 -1 0))
-    (v= (vec 0 0 0))
-    (= (sqrt 2)))
+    (v~= (vec 0 0 0))
+    (~= (sqrt 2)))
   (is-values (bounding-sphere (f32* +1 +1 +1  -1 +1 +1  +1 -1 +1  -1 -1 +1
                                     +1 +1 -1  -1 +1 -1  +1 -1 -1  -1 -1 -1))
-    (v= (vec 0 0 0))
-    (= (sqrt 3))))
+    (v~= (vec 0 0 0))
+    (~= (sqrt 3))))
