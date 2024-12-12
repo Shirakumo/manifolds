@@ -3,6 +3,7 @@
   (:use
    #:cl
    #:parachute
+   #:org.shirakumo.fraf.math
    #:org.shirakumo.fraf.manifolds)
   (:local-nicknames
    (#:wavefront #:org.shirakumo.fraf.wavefront)))
@@ -82,3 +83,27 @@
                (true (typep result-faces 'face-array))))))
     (test 'single-float)
     (test 'double-float)))
+
+(define-test bounding-sphere
+  (is-values (bounding-sphere (f32*))
+    (v= 0)
+    (= 0))
+  (is-values (bounding-sphere (f32* 0 0 0))
+    (v= 0)
+    (= 0))
+  (is-values (bounding-sphere (f32* 1 0 0))
+    (v= (vec 1 0 0))
+    (= 0))
+  (is-values (bounding-sphere (f32* 1 0 0 -1 0 0))
+    (v= (vec 0 0 0))
+    (= 1))
+  (is-values (bounding-sphere (f32* 1 2 3 -1 2 3))
+    (v= (vec 0 2 3))
+    (= 1))
+  (is-values (bounding-sphere (f32* +1 +1 0  -1 +1 0  +1 -1 0  -1 -1 0))
+    (v= (vec 0 0 0))
+    (= (sqrt 2)))
+  (is-values (bounding-sphere (f32* +1 +1 +1  -1 +1 +1  +1 -1 +1  -1 -1 +1
+                                    +1 +1 -1  -1 +1 -1  +1 -1 -1  -1 -1 -1))
+    (v= (vec 0 0 0))
+    (= (sqrt 3))))
