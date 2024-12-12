@@ -4,8 +4,8 @@
 ;;; Subspan.cs
 (defstruct (subspan (:constructor %make-subspan))
   (vertices #() :type vertex-array)
-  (membership #() :type bit-vector)
-  (members #() :type (simple-array vertex (4)))
+  (membership (make-array 0 :element-type 'bit) :type bit-vector)
+  (members (make-array 4 :element-type 'vertex) :type (simple-array vertex (4)))
   (q (meye 3) :type mat3)
   (r (mat3) :type mat3)
   (u (vec3) :type vec3)
@@ -33,14 +33,15 @@
                     (w (i) `(vref w ,i)))
            ,@body)))))
 
-(defun make-subspan (vertices k)
+(defun make-subspan (vertices k &optional (subspan (%make-subspan)))
   (let ((membership (make-array (truncate (length vertices) 3) :element-type 'bit))
         (members (make-array 4 :element-type 'vertex)))
     (setf (aref membership k) 1)
     (setf (aref members 0) k)
-    (%make-subspan :vertices vertices
-                   :membership membership
-                   :members members)))
+    (setf (subspan-vertices subspan) vertices)
+    (setf (subspan-membership subspan) membership)
+    (setf (subspan-members subspan) members)
+    subspan))
 
 (defun subspan-origin (subspan)
   (v (subspan-vertices subspan) (aref (subspan-members subspan) (subspan-rank subspan))))
@@ -179,8 +180,7 @@
            (subspan-hessenberg-clear subspan vertex)))))
 
 ;;; Miniball.cs
-(defstruct miniball
-  (vertices #() :type vertex-array)
+(defstruct (miniball (:include subspan))
   (center (vec3) :type vec3)
   (center-to-aff (vec3) :type vec3)
   (center-to-point (vec3) :type vec3)
@@ -189,7 +189,6 @@
   (dist-to-aff-square 0.0 :type single-float)
   (squared-radius 0.0 :type single-float)
   (radius 0.0 :type single-float)
-  (support NIL :type subspan)
   (stopper 0 :type (signed-byte 31))
   (eps 1e-14 :type single-float))
 
@@ -204,41 +203,39 @@
                        (dist-to-aff-square (miniball-dist-to-aff-square ,miniball))
                        (squared-radius (miniball-squared-radius ,miniball))
                        (radius (miniball-radius ,miniball))
-                       (support (miniball-support ,miniball))
                        (stopper (miniball-stopper ,miniball))
                        (eps (miniball-eps ,miniball)))
        ,@body)))
 
 (defun miniball-compute-dist-to-aff (miniball)
   (with-miniball (miniball)
-    (setf dist-to-aff-square (subspan-shortest-vector-to-span support center center-to-aff))
+    (setf dist-to-aff-square (subspan-shortest-vector-to-span miniball center center-to-aff))
     (setf dist-to-aff (sqrt dist-to-aff-square))))
 
 (defun miniball-update-radius (miniball)
   (with-miniball (miniball)
-    (setf squared-radius (vsqrdistance (subspan-any support) center))
+    (setf squared-radius (vsqrdistance (subspan-any miniball) center))
     (setf radius (sqrt squared-radius))))
 
 (defun miniball-successful-drop (miniball)
   (with-miniball (miniball)
-    (subspan-find-affine-coefficients support center lambdas)
+    (subspan-find-affine-coefficients miniball center lambdas)
     (let ((smallest 0)
           (minimum 1.0))
-      (dotimes (i (subspan-size support))
+      (dotimes (i (subspan-size miniball))
         (when (< (aref lambdas i) minimum)
           (setf minimum (aref lambdas i))
           (setf smallest i)))
       (when (<= minimum 0)
-        (subspan-remove support smallest)
+        (subspan-remove miniball smallest)
         T))))
 
 (defun miniball-find-stop-fraction (miniball)
   (with-miniball (miniball)
-    (let ((scale 1.0)
-          (vertices vertices))
+    (let ((scale 1.0))
       (setf stopper -1)
       (dotimes (j (truncate (length vertices) 3) scale)
-        (unless (subspan-member-p support j)
+        (unless (subspan-member-p miniball j)
           (!v- center-to-point (v vertices j) center)
           (let ((dir-point-prod (v. center-to-aff center-to-point)))
             (unless (< (- dist-to-aff-square dir-point-prod) (* eps radius dist-to-aff))
@@ -263,11 +260,10 @@
               do (when (<= squared-radius dist)
                    (setf squared-radius dist)
                    (setf farthest i)))
-        (let ((miniball (make-miniball :vertices vertices
-                                       :center center
+        (let ((miniball (make-miniball :center center
                                        :squared-radius squared-radius
-                                       :radius (sqrt squared-radius)
-                                       :support (make-subspan vertices farthest))))
+                                       :radius (sqrt squared-radius))))
+          (make-subspan vertices farthest miniball)
           (with-miniball (miniball)
             (loop (miniball-compute-dist-to-aff miniball)
                   (loop while (<= dist-to-aff eps)
@@ -278,7 +274,7 @@
                     (cond ((<= 0 stopper)
                            (nv+* center center-to-aff scale)
                            (miniball-update-radius miniball)
-                           (subspan-add support stopper))
+                           (subspan-add miniball stopper))
                           (T
                            (nv+ center center-to-aff)
                            (miniball-update-radius miniball)
