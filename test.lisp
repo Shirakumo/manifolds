@@ -113,3 +113,20 @@
                                     +1 +1 -1  -1 +1 -1  +1 -1 -1  -1 -1 -1))
     (v~= (vec 0 0 0))
     (~= (sqrt 3))))
+
+(defun make-sphere-vertices (count)
+  (let ((array (make-array (* count 3) :element-type 'single-float))
+        (sample (vec3)))
+    (dotimes (i count array)
+      (labels ((randn ()
+                 (* (sqrt (* -2.0 (log (random 1.0))))
+                    (cos (* 2 (float PI 0f0) (random 1.0))))))
+        (vsetf sample (randn) (randn) (randn))
+        (nv* sample (* (/ (vlength sample)) (expt (random 1.0) 1/3)))
+        (replace array (varr sample) :start1 (* i 3))))))
+
+(define-test bounding-sphere.smoke
+  (dotimes (i 100)
+    (multiple-value-bind (center radius) (bounding-sphere (make-sphere-vertices i))
+      (is <= 1.0 (vlength center))
+      (is <= 1.0 radius))))
