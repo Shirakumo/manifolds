@@ -126,9 +126,11 @@
       (loop for j downfrom (1- r) to 0
             do (loop for k from (1+ j) below r
                      do (decf (w j) (* (aref lambdas k) (RR k j))))
-               (let ((lj (/ (w j) (RR j j))))
-                 (setf (aref lambdas j) lj)
-                 (decf origin-lambda lj)))
+               (when (/= 0 (RR j j))
+                 ;; KLUDGE: Can get div by zero here, not sure what to do about it.
+                 (let ((lj (/ (w j) (RR j j))))
+                   (setf (aref lambdas j) lj)
+                   (decf origin-lambda lj))))
       (setf (aref lambdas r) origin-lambda)
       NIL)))
 
@@ -239,11 +241,13 @@
                            (!v- center-to-point (v vertices j tmp) center)
                            (let ((dir-point-prod (v. center-to-aff center-to-point)))
                              (unless (< (- dist-to-aff-square dir-point-prod) (* eps radius dist-to-aff))
-                               (let ((bound (/ (- squared-radius (vsqrlength center-to-point))
-                                               (* 2 (- dist-to-aff-square dir-point-prod)))))
-                                 (when (< 0 bound scale)
-                                   (setf scale bound)
-                                   (setf stopper j)))))))))
+                               (let ((a (- squared-radius (vsqrlength center-to-point)))
+                                     (b (* 2 (- dist-to-aff-square dir-point-prod))))
+                                 (when (< 0 b)
+                                   (let ((bound (/ a b)))
+                                     (when (< 0 bound scale)
+                                       (setf scale bound)
+                                       (setf stopper j)))))))))))
                    (successful-drop ()
                      (subspan-find-affine-coefficients subspan center lambdas)
                      (let ((smallest 0)
