@@ -427,6 +427,7 @@ See FACE-ARRAY (type)")
   (function bounding-sphere
     "Computes a tight bounding sphere encapsulating the set of vertices.
 
-Returns two values, the center of the sphere as a VEC3 and its radius.
+Returns two values, the center of the sphere as a *VEC3 and its radius.
+The returned types match the input vertex array's element type.
 
 See VERTEX-ARRAY (type)"))
