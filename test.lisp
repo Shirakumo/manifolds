@@ -11,16 +11,17 @@
 
 (in-package #:org.shirakumo.fraf.manifolds.test)
 
-(defvar *mesh-directory*
+(defvar *test-directory*
   (merge-pathnames
    (make-pathname :directory '(:relative "test"))
    (make-pathname :name nil :type nil :defaults #.(or *compile-file-pathname*
                                                       *load-pathname*))))
 
+(defun test-file (name)
+  (merge-pathnames name *test-directory*))
+
 (defun load-mesh (name)
-  (let* ((filename (merge-pathnames
-                    (make-pathname :name name :type "obj")
-                    *mesh-directory*))
+  (let* ((filename (test-file (make-pathname :name name :type "obj")))
          (context (wavefront:parse filename))
          (meshes (wavefront:extract-meshes context)))
     (assert (= (length meshes) 1))
@@ -34,6 +35,16 @@
 
 (defun face-array (indices)
   (make-array 3 :element-type 'u32 :initial-contents indices))
+
+(defun load-vertices (name)
+  (let* ((filename (test-file (make-pathname :name name :type "obj")))
+         (context (wavefront:parse filename))
+         (src (wavefront:vertices context))
+         (dst (make-array (* 3/4 (length src)) :element-type 'single-float)))
+    (loop for i from 0 below (length dst) by 3
+          for j from 0 below (length src) by 4
+          do (replace dst src :start1 i :start2 j :end1 (+ i 3)))
+    dst))
 
 (define-test edge-list.smoke
   (let* ((mesh (load-mesh "box"))
@@ -101,39 +112,24 @@
   (is-values (bounding-sphere (f32* 1 2 3 -1 2 3))
     (v~= (vec 0 2 3))
     (~= 1))
-  (is-values (bounding-sphere (f32* +1 +1 0  -1 +1 0  +1 -1 0  -1 -1 0))
+  (is-values (bounding-sphere (load-vertices "quad"))
     (v~= (vec 0 0 0))
     (~= (sqrt 2)))
-  (is-values (bounding-sphere (f32* +1 +1 +1  -1 +1 +1  +1 -1 +1  -1 -1 +1
-                                    +1 +1 -1  -1 +1 -1  +1 -1 -1  -1 -1 -1))
+  (is-values (bounding-sphere (load-vertices "cube"))
     (v~= (vec 0 0 0))
     (~= (sqrt 3)))
-  (is-values (bounding-sphere (f32* +0.5 +0.5 +0.5  -0.5 +0.5 +0.5  +0.5 -0.5 +0.5  -0.5 -0.5 +0.5
-                                    +0.5 +0.5 -0.5  -0.5 +0.5 -0.5  +0.5 -0.5 -0.5  -0.5 -0.5 -0.5))
-    (v~= (vec 0 0 0))
-    (~= (* 0.5 (sqrt 3))))
-  (is-values (bounding-sphere (f32* +1 +1 +1  -1 +1 +1  +1 -1 +1  -1 -1 +1
-                                    +1 +1 -1  -1 +1 -1  +1 -1 -1  -1 -1 -1
-                                     0  0  0))
+  (is-values (bounding-sphere (load-vertices "adversarial-cube"))
     (v~= (vec 0 0 0))
     (~= (sqrt 3)))
-  (is-values (bounding-sphere (f32*  0  0  0
-                                    +1 +1 +1  -1 +1 +1  +1 -1 +1  -1 -1 +1
-                                    +1 +1 -1  -1 +1 -1  +1 -1 -1  -1 -1 -1))
-    (v~= (vec 0 0 0))
-    (~= (sqrt 3)))
-  (is-values (bounding-sphere (f32* +1.0 +1.0 +1.0  -1.0 +1.0 +1.0  +1.0 -1.0 +1.0  -1.0 -1.0 +1.0
-                                    +1.0 +1.0 -1.0  -1.0 +1.0 -1.0  +1.0 -1.0 -1.0  -1.0 -1.0 -1.0
-                                    +0.5 +0.5 +0.5  -0.5 +0.5 +0.5  +0.5 -0.5 +0.5  -0.5 -0.5 +0.5
-                                    +0.5 +0.5 -0.5  -0.5 +0.5 -0.5  +0.5 -0.5 -0.5  -0.5 -0.5 -0.5))
-    (v~= (vec 0 0 0))
-    (~= (sqrt 3)))
-  (is-values (bounding-sphere (f32* +0.5 +0.5 +0.5  -0.5 +0.5 +0.5  +0.5 -0.5 +0.5  -0.5 -0.5 +0.5
-                                    +0.5 +0.5 -0.5  -0.5 +0.5 -0.5  +0.5 -0.5 -0.5  -0.5 -0.5 -0.5
-                                    +1.0 +1.0 +1.0  -1.0 +1.0 +1.0  +1.0 -1.0 +1.0  -1.0 -1.0 +1.0
-                                    +1.0 +1.0 -1.0  -1.0 +1.0 -1.0  +1.0 -1.0 -1.0  -1.0 -1.0 -1.0))
-    (v~= (vec 0 0 0))
-    (~= (sqrt 3))))
+  (is-values (bounding-sphere (load-vertices "cospherical-points"))
+    (v~= (vec3 -1.560872e-12 -4.71446e-12 3.675805e-12))
+    (~= 1.0))
+  (is-values (bounding-sphere (load-vertices "longitude-latitude-model"))
+    (v~= (vec3 1.0952965e-12 7.764871e-12 2.0978248e-16))
+    (~= 1.0))
+  (is-values (bounding-sphere (load-vertices "random-points"))
+    (v~= (vec 0.01610931 -0.003394038 -0.003313784))
+    (~= 0.8286737)))
 
 (defun make-sphere-vertices (count)
   (let ((array (make-array (* count 3) :element-type 'single-float))
