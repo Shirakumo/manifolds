@@ -460,7 +460,7 @@
              (setf (vx max) (max (vx max) x))
              (setf (vy max) (max (vy max) y))
              (setf (vz max) (max (vz max) z)))
-    (let ((bsize (nv* (v- max min) 0.5)))
+    (let ((bsize (nv* (nv- max min) 0.5)))
       (values (nv+ min bsize) bsize))))
 
 (defun vertex-faces (faces &optional vertex-faces)
