@@ -583,63 +583,6 @@
                  (vector-push-extend c mesh-faces)))
           collect (cons mesh-vertices (make-array (length mesh-faces) :element-type '(unsigned-byte 32) :initial-contents mesh-faces)))))
 
-(defstruct (vertex-index
-            (:include vec3)
-            (:constructor %make-vertex-index (varr3 index))
-            (:copier NIL)
-            (:predicate NIL))
-  (index 0 :type (unsigned-byte 32) :read-only T))
-
-(defmethod org.shirakumo.fraf.trial.space:location ((object vertex-index))
-  object)
-
-(defmethod org.shirakumo.fraf.trial.space:bsize ((object vertex-index))
-  (vec 0 0 0))
-
-(defun normalize (vertices indices &key (threshold 0.001) (center (vec 0 0 0)) (scale 1.0) (angle-threshold 0.001))
-  (check-type vertices vertex-array)
-  (check-type indices face-array)
-  ;; TODO: could probably do this inline by going over verts first, then faces and only copying once.
-  (macrolet ((compute (vertex-component-type)
-               `(locally (declare (type (vertex-array ,vertex-component-type) vertices))
-                  (let ((center ,(case vertex-component-type
-                                   (double-float `(dvec center))
-                                   (single-float 'center)))
-                        (tree (org.shirakumo.fraf.trial.space.kd-tree:make-kd-tree))
-                        (new-vertices (make-array 0 :element-type ',vertex-component-type :adjustable T :fill-pointer T))
-                        (new-indices (make-array 0 :element-type 'u32 :adjustable T :fill-pointer T)))
-                    (flet ((vertex-idx (p)
-                             (let* ((p (vec (nv* (nv- p center) scale)))
-                                    (nearest (org.shirakumo.fraf.trial.space.kd-tree:kd-tree-nearest p tree :max-radius threshold)))
-                               (cond (nearest
-                                      (vertex-index-index nearest))
-                                     (T
-                                      (let ((index (truncate (length new-vertices) 3)))
-                                        (org.shirakumo.fraf.trial.space.kd-tree:kd-tree-insert
-                                         (%make-vertex-index (varr3 p) index) tree)
-                                        (vector-push-extend (coerce (vx p) ',vertex-component-type) new-vertices)
-                                        (vector-push-extend (coerce (vy p) ',vertex-component-type) new-vertices)
-                                        (vector-push-extend (coerce (vz p) ',vertex-component-type) new-vertices)
-                                        index))))))
-                      (loop for i from 0 below (length indices) by 3
-                            for p1 = (v vertices (aref indices (+ i 0)))
-                            for p2 = (v vertices (aref indices (+ i 1)))
-                            for p3 = (v vertices (aref indices (+ i 2)))
-                            for i1 = (vertex-idx p1)
-                            for i2 = (vertex-idx p2)
-                            for i3 = (vertex-idx p3)
-                            do (when (and (/= i1 i2) (/= i1 i3) (/= i2 i3)
-                                          (or (<= angle-threshold 0)
-                                              (< angle-threshold (vsqrlength (vc (v- p2 p1) (v- p2 p3))))))
-                                 (vector-push-extend i1 new-indices)
-                                 (vector-push-extend i2 new-indices)
-                                 (vector-push-extend i3 new-indices))))
-                    (values (replace (make-array (length new-vertices) :element-type ',vertex-component-type) new-vertices)
-                            (replace (make-array (length new-indices) :element-type (array-element-type indices)) new-indices))))))
-    (etypecase (aref vertices 0)
-      (single-float (compute single-float))
-      (double-float (compute double-float)))))
-
 (defun transform-mesh (vertices matrix)
   (etypecase vertices
     ((vertex-array f32)

@@ -185,7 +185,8 @@ FACE-ADJACENCY-LIST.
 
 FACES must be a FACE-ARRAY.
 
-See FACE-ADJACENCY-LIST")
+See FACE-ADJACENCY-LIST
+See FACE-ARRAY (type)")
 
   (function edge-adjacency-map
     "Returns a map for the adjacent face for every edge of every face.
@@ -200,7 +201,8 @@ FACE-ADJACENCY-LIST.
 FACES must be a FACE-ARRAY.
 
 See ADJACENT-FACES
-See FACE-ADJACENCY-LIST")
+See FACE-ADJACENCY-LIST
+See FACE-ARRAY (type)")
 
   (function boundary-list
     "Returns a vector of edges on the boundary of the faces.
@@ -401,26 +403,6 @@ VERTICES must be a VERTEX-ARRAY.
 
 See VERTEX-ARRAY (type)
 See FACE-ARRAY (type)")
-  
-  (function normalize
-    "Normalizes the mesh by removing faces with no surface area, and merging vertices that are within a threshold from each other.
-
-Returns two values, a fresh VERTICES array and fresh FACES array.
-The THRESHOLD is the distance threshold below which two vertices are
-considered the same. You may also optionally pass in a CENTER and
-SCALE to which the resulting vertices are positioned and scaled prior
-to normalisation.
-The ANGLE-THRESHOLD is a separate parameter to determine how obtuse an
-angle should be for a face to be considered to have no relevant
-surface and be removed. This may introduce tiny holes and make the
-meshes no longer manifold. To keep all triangles, set this parameter
-to zero.
-
-FACES must be a FACE-ARRAY.
-VERTICES must be a VERTEX-ARRAY.
-
-See VERTEX-ARRAY (type)
-See FACE-ARRAY (type)")
 
   (function transform-mesh
     "Transforms all vertices of the mesh by the given transform matrix.
@@ -463,3 +445,72 @@ Returns two values, the center of the sphere as a *VEC3 and its radius.
 The returned types match the input vertex array's element type.
 
 See VERTEX-ARRAY (type)"))
+
+(docs:define-docs
+  (function remove-unused
+    "Removes any vertex not referenced by a face, and any face that refers to two or more identical vertices.
+
+Returns two values, a fresh VERTICES array and fresh FACES array.
+
+FACES must be a FACE-ARRAY.
+VERTICES must be a VERTEX-ARRAY.
+
+See VERTEX-ARRAY (type)
+See FACE-ARRAY (type)
+See NORMALIZE")
+
+  (function remove-degenerate-triangles
+    "Removes any triangle with a corner angle smaller than the given threshold.
+
+The THRESHOLD is a parameter to determine how obtuse an
+angle should be for a face to be considered to have no relevant
+surface and be removed. This will potentially move vertices and
+introduce new vertices, and remove or introduce new faces.
+
+This will also compact the mesh via REMOVE-UNUSED.
+
+Returns two values, a fresh VERTICES array and fresh FACES array.
+
+FACES must be a FACE-ARRAY.
+VERTICES must be a VERTEX-ARRAY.
+
+See VERTEX-ARRAY (type)
+See FACE-ARRAY (type)
+See NORMALIZE
+See REMOVE-UNUSED")
+
+  (function remove-duplicate-vertices
+    "Removes all vertices within a threshold of another vertex, merging them together.
+
+The THRESHOLD is the distance threshold below which two vertices are
+considered the same. You may also optionally pass in a CENTER and
+SCALE to which the resulting vertices are positioned and scaled prior
+to normalisation.
+
+Returns two values, a fresh VERTICES array and fresh FACES array.
+
+FACES must be a FACE-ARRAY.
+VERTICES must be a VERTEX-ARRAY.
+
+See VERTEX-ARRAY (type)
+See FACE-ARRAY (type)
+See NORMALIZE")
+  
+  (function normalize
+    "Normalizes the mesh by removing degenerate geometry.
+
+This is a shorthand for invoking
+REMOVE-DUPLICATE-VERTICES (if THRESHOLD is non-NIL and greater than
+zero) and 
+REMOVE-DEGENERATE-TRIANGLES (if ANGLE-THRESHOLD is non-NIL and greater
+than zero)
+
+Returns two values, a fresh VERTICES array and fresh FACES array.
+
+FACES must be a FACE-ARRAY.
+VERTICES must be a VERTEX-ARRAY.
+
+See VERTEX-ARRAY (type)
+See FACE-ARRAY (type)
+See REMOVE-DEGENERATE-TRIANGLES
+See REMOVE-DUPLICATE-VERTICES"))

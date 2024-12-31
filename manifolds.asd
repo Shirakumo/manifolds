@@ -13,6 +13,7 @@
                (:file "manifolds")
                (:file "convert")
                (:file "miniball")
+               (:file "normalize")
                (:file "documentation"))
   :depends-on (:3d-math
                :3d-spaces
