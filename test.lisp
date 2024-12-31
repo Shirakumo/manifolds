@@ -7,7 +7,9 @@
    #:org.shirakumo.fraf.math
    #:org.shirakumo.fraf.manifolds)
   (:local-nicknames
-   (#:wavefront #:org.shirakumo.fraf.wavefront)))
+   (#:wavefront #:org.shirakumo.fraf.wavefront))
+  (:export
+   #:normalize-file))
 
 (in-package #:org.shirakumo.fraf.manifolds.test)
 
@@ -21,12 +23,21 @@
   (merge-pathnames name *test-directory*))
 
 (defun load-mesh (name)
-  (let* ((filename (test-file (make-pathname :name name :type "obj")))
+  (let* ((filename (test-file (if (stringp name) (make-pathname :name name :type "obj") name)))
          (context (wavefront:parse filename))
-         (meshes (wavefront:extract-meshes context)))
+         (meshes (wavefront:extract-meshes context NIL '(:position))))
     (assert (= (length meshes) 1))
     (assert (= (wavefront:face-length (first meshes)) 3))
     (first meshes)))
+
+(defun save-mesh (file vertices faces)
+  (wavefront:serialize (make-instance 'wavefront:mesh
+                                      :name "Mesh"
+                                      :vertex-data vertices
+                                      :index-data faces
+                                      :attributes '(:position))
+                       file :if-exists :supersede)
+  file)
 
 (defun vertex-array (component-type components)
   (map-into (make-array (length components) :element-type component-type)
@@ -82,6 +93,11 @@
                (of-type 'extended-edge element))
          (boundary-list (wavefront:index-data mesh)))))
 
+(defun normalize-file (in out &rest args)
+  (let ((mesh (load-mesh in)))
+    (multiple-value-bind (v f) (apply #'normalize (wavefront:vertex-data mesh) (wavefront:index-data mesh) args)
+      (save-mesh (test-file (if (stringp out) (make-pathname :name out :type "obj") out)) v f))))
+
 (define-test normalize.smoke
   (flet ((test (vertex-component-type)
            (let* ((vertices (vertex-array vertex-component-type
@@ -94,7 +110,11 @@
                                (upgraded-array-element-type vertex-component-type)))
                (true (typep result-faces 'face-array))))))
     (test 'single-float)
-    (test 'double-float)))
+    (test 'double-float))
+
+  (dolist (file (directory (test-file "degenerate-*.obj")))
+    (let* ((mesh (load-mesh (pathname-name file))))
+      (finish (normalize (wavefront:vertex-data mesh) (wavefront:index-data mesh))))))
 
 (define-test bounding-sphere
   (is-values (bounding-sphere (f64*))
