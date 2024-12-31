@@ -99,6 +99,30 @@
                (incf i))
           finally (return edges))))
 
+(defun adjacent-faces (face a b faces &optional adjacency)
+  (unless adjacency (setf adjacency (face-adjacency-list faces)))
+  (loop for adjacent in (aref adjacency face)
+        for i0 = (aref faces (+ (* 3 adjacent) 0))
+        for i1 = (aref faces (+ (* 3 adjacent) 1))
+        for i2 = (aref faces (+ (* 3 adjacent) 2))
+        when (or (and (= i0 a) (or (= i1 b) (= i2 b)))
+                 (and (= i1 a) (or (= i0 b) (= i2 b)))
+                 (and (= i2 a) (or (= i0 b) (= i1 b))))
+        collect adjacent))
+
+(defun edge-adjacency-map (faces &optional adjacency)
+  (check-type faces face-array)
+  (unless adjacency (setf adjacency (face-adjacency-list faces)))
+  (let ((edges (make-array (length faces))))
+    (flet ((map-edge (tri a b)
+             (setf (aref edges tri) (adjacent-faces tri a b faces adjacency))))
+      (loop for i from 0 below (length faces) by 3
+            for tri from 0
+            do (map-edge tri (aref faces (+ i 0)) (aref faces (+ i 1)))
+               (map-edge tri (aref faces (+ i 1)) (aref faces (+ i 2)))
+               (map-edge tri (aref faces (+ i 2)) (aref faces (+ i 0)))))
+    edges))
+
 (defun boundary-list (faces)
   (check-type faces face-array)
   (let ((edge-table (make-hash-table :test 'eql))

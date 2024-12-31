@@ -128,3 +128,20 @@
       ,@body)
      ((vertex-array double-float)
       ,@body)))
+
+(defmacro with-face-specialization ((var) &body body)
+  `(etypecase ,var
+     ((face-array (unsigned-byte 16))
+      ,@body)
+     ((face-array (unsigned-byte 32))
+      ,@body)))
+
+(defun simplify (array)
+  (make-array (length array) :element-type (array-element-type array)
+                             :initial-contents array))
+
+(defun unsimplify (array)
+  (make-array (length array) :element-type (array-element-type array)
+                             :initial-contents array
+                             :adjustable T
+                             :fill-pointer T))

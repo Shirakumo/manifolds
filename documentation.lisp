@@ -170,6 +170,31 @@ FACES must be a FACE-ARRAY.
 See FACE-ARRAY (type)
 See HALF-EDGE-LIST")
 
+  (function adjacent-faces
+    "Returns a list of adjacent faces bordering the AB edge of FACE.
+
+ADJACENCY if given should be the face adjacency list obtained via
+FACE-ADJACENCY-LIST.
+
+FACES must be a FACE-ARRAY.
+
+See FACE-ADJACENCY-LIST")
+
+  (function edge-adjacency-map
+    "Returns a map for the adjacent face for every edge of every face.
+
+The returned array is indexed by [ AB, BC, CA, ... ] of the edges of
+FACES, with each entry containing a list of other face indices that
+are adjacent to that edge, excluding the face of the edge being indexed.
+
+ADJACENCY if given should be the face adjacency list obtained via
+FACE-ADJACENCY-LIST.
+
+FACES must be a FACE-ARRAY.
+
+See ADJACENT-FACES
+See FACE-ADJACENCY-LIST")
+
   (function boundary-list
     "Returns a vector of edges on the boundary of the faces.
 

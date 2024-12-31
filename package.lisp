@@ -28,6 +28,8 @@
    #:face-adjacency-list
    #:half-edge-list
    #:edge-list
+   #:adjacent-faces
+   #:edge-adjacency-map
    #:boundary-list
    #:v
    #:vertex-normal
