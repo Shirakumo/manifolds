@@ -170,6 +170,13 @@ FACES must be a FACE-ARRAY.
 See FACE-ARRAY (type)
 See HALF-EDGE-LIST")
 
+  (function face-corner
+    "Returns the opposite corner of edge AB on FACE.
+
+FACES must be a FACE-ARRAY.
+
+See FACE-ARRAY (type)")
+
   (function adjacent-faces
     "Returns a list of adjacent faces bordering the AB edge of FACE.
 
