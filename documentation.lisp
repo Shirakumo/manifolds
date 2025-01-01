@@ -498,7 +498,7 @@ See NORMALIZE")
 
 This is a shorthand for invoking
 REMOVE-DUPLICATE-VERTICES (if THRESHOLD is non-NIL and greater than
-zero) and 
+zero) or REMOVE-UNUSED (if not) and 
 REMOVE-DEGENERATE-TRIANGLES (if ANGLE-THRESHOLD is non-NIL and greater
 than zero)
 
@@ -509,5 +509,6 @@ VERTICES must be a VERTEX-ARRAY.
 
 See VERTEX-ARRAY (type)
 See FACE-ARRAY (type)
+See REMOVE-UNUSED
 See REMOVE-DEGENERATE-TRIANGLES
 See REMOVE-DUPLICATE-VERTICES"))
