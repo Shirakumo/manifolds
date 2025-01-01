@@ -464,12 +464,14 @@ See FACE-ARRAY (type)
 See NORMALIZE")
 
   (function remove-degenerate-triangles
-    "Removes any triangle with a corner angle smaller than the given threshold.
+    "Removes any triangle with a corner angle or area smaller than the given threshold
 
-The THRESHOLD is a parameter to determine how obtuse an
+The ANGLE-THRESHOLD (rad) is a parameter to determine how narrow an
 angle should be for a face to be considered to have no relevant
-surface and be removed. This will potentially move vertices and
-introduce new vertices, and remove or introduce new faces.
+surface and be removed. Similarly, AREA-THRESHOLD is a parameter to
+determine the surface area below which a triangle is deleted. This
+will potentially move vertices and introduce new vertices, and remove
+or introduce new faces.
 
 This will also compact the mesh via REMOVE-UNUSED.
 
@@ -506,8 +508,8 @@ See NORMALIZE")
 This is a shorthand for invoking
 REMOVE-DUPLICATE-VERTICES (if THRESHOLD is non-NIL and greater than
 zero) and
-REMOVE-DEGENERATE-TRIANGLES (if ANGLE-THRESHOLD is non-NIL and greater
-than zero) or REMOVE-UNUSED (if not)
+REMOVE-DEGENERATE-TRIANGLES (if ANGLE-THRESHOLD or AREA-THRESHOLD are
+non-NIL and greater than zero) or REMOVE-UNUSED (if not)
 
 Returns two values, a fresh VERTICES array and fresh FACES array.
 

@@ -60,7 +60,7 @@
                        (incf fi 3)))
             (values (simplify new-vertices) new-indices)))))))
 
-(defun remove-degenerate-triangles (vertices indices &key (threshold 0.01))
+(defun remove-degenerate-triangles (vertices indices &key (angle-threshold 0.01) (area-threshold 0.001))
   (declare (optimize speed (safety 1)))
   (check-type vertices vertex-array)
   (check-type indices face-array)
@@ -70,7 +70,8 @@
               (indices (unsimplify indices))
               (adjacency (unsimplify (face-adjacency-list indices)))
               (vfaces (unsimplify (vertex-faces indices)))
-              (threshold (coerce threshold ',',(second vtype))))
+              (angle-threshold (coerce angle-threshold ',',(second vtype)))
+              (area-threshold (coerce area-threshold ',',(second vtype))))
           (declare (type (unsimple-array ,(second ftype)) indices))
           (declare (type (unsimple-array ,',(second vtype)) vertices))
           (declare (type unsimple-array adjacency vfaces))
@@ -161,7 +162,22 @@
                                                     (push ar (aref adjacency face))))))
                            (delete-triangle face)
                            (mapc #'delete-triangle adjacents))))
-                     (consider (corner a b face)
+                     (consider-area (a b c face)
+                       (let ((ap (v vertices a))
+                             (bp (v vertices b))
+                             (cp (v vertices c)))
+                         (when (< 0 (triangle-area ap bp cp) area-threshold)
+                           (let ((a-d (vdistance ap bp))
+                                 (b-d (vdistance bp cp))
+                                 (c-d (vdistance cp ap)))
+                             ;; Find smallest edge and fuse it
+                             (cond ((and (< a-d b-d) (< a-d c-d))
+                                    (fuse-edge a b face))
+                                   ((and (< b-d a-d) (< b-d c-d))
+                                    (fuse-edge b c face))
+                                   (T
+                                    (fuse-edge c a face)))))))
+                     (consider-angle (corner a b face)
                        ;; Consider one corner of the triangle for merging
                        (let* ((cp (v vertices corner))
                               (ap (v vertices a))
@@ -169,7 +185,7 @@
                               (c-a (v- ap cp))
                               (c-b (v- bp cp)))
                          ;; Make sure we don't consider zero-area triangles at all
-                         (when (and (v/= c-a 0) (v/= c-b 0) (< (vangle c-a c-b) threshold))
+                         (when (and (v/= c-a 0) (v/= c-b 0) (< (vangle c-a c-b) angle-threshold))
                            (let ((a-d (vdistance cp ap))
                                  (b-d (vdistance cp bp))
                                  (ab-d (vdistance ap bp)))
@@ -193,9 +209,10 @@
                        for p2 = (aref indices (+ i 1))
                        for p3 = (aref indices (+ i 2))
                        do (when (and (/= p1 p2) (/= p1 p3) (/= p2 p3)
-                                     (or (consider p1 p2 p3 face)
-                                         (consider p2 p1 p3 face)
-                                         (consider p3 p1 p2 face)))
+                                     (or (consider-area p1 p2 p3 face)
+                                         (consider-angle p1 p2 p3 face)
+                                         (consider-angle p2 p1 p3 face)
+                                         (consider-angle p3 p1 p2 face)))
                             (setf found T))
                        finally (when found (go retry))))
               (remove-unused (simplify vertices) (simplify indices))))))))
@@ -238,9 +255,15 @@
                      (vector-push-extend i3 new-indices))))
         (values (simplify new-vertices) (simplify new-indices))))))
 
-(defun normalize (vertices indices &key (threshold 0.001) (center (vec 0 0 0)) (scale 1.0) (angle-threshold 0.001))
-  (multiple-value-setq (vertices indices) (remove-duplicate-vertices vertices indices :threshold threshold :center center :scale scale))
-  (if (and angle-threshold (< 0 angle-threshold))
-      (multiple-value-setq (vertices indices) (remove-degenerate-triangles vertices indices :threshold angle-threshold))
+(defun normalize (vertices indices &key (threshold 0.001) (center (vec 0 0 0)) (scale 1.0) (angle-threshold 0.001) (area-threshold 0.001))
+  (multiple-value-setq (vertices indices) (remove-duplicate-vertices vertices indices
+                                                                     :threshold threshold
+                                                                     :center center
+                                                                     :scale scale))
+  (if (or (and angle-threshold (< 0 angle-threshold))
+          (and area-threshold (< 0 area-threshold)))
+      (multiple-value-setq (vertices indices) (remove-degenerate-triangles vertices indices
+                                                                           :angle-threshold angle-threshold
+                                                                           :area-threshold area-threshold))
       (multiple-value-setq (vertices indices) (remove-unused vertices indices)))
   (values vertices indices))
