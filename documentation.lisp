@@ -498,9 +498,9 @@ See NORMALIZE")
 
 This is a shorthand for invoking
 REMOVE-DUPLICATE-VERTICES (if THRESHOLD is non-NIL and greater than
-zero) or REMOVE-UNUSED (if not) and 
+zero) and
 REMOVE-DEGENERATE-TRIANGLES (if ANGLE-THRESHOLD is non-NIL and greater
-than zero)
+than zero) or REMOVE-UNUSED (if not)
 
 Returns two values, a fresh VERTICES array and fresh FACES array.
 

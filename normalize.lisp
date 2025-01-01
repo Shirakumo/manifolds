@@ -203,9 +203,8 @@
         (values (simplify new-vertices) (simplify new-indices))))))
 
 (defun normalize (vertices indices &key (threshold 0.001) (center (vec 0 0 0)) (scale 1.0) (angle-threshold 0.001))
-  (if (and threshold (< 0 threshold))
-      (multiple-value-setq (vertices indices) (remove-duplicate-vertices vertices indices :threshold threshold :center center :scale scale))
+  (multiple-value-setq (vertices indices) (remove-duplicate-vertices vertices indices :threshold threshold :center center :scale scale))
+  (if (and angle-threshold (< 0 angle-threshold))
+      (multiple-value-setq (vertices indices) (remove-degenerate-triangles vertices indices :threshold angle-threshold))
       (multiple-value-setq (vertices indices) (remove-unused vertices indices)))
-  (when (and angle-threshold (< 0 angle-threshold))
-    (multiple-value-setq (vertices indices) (remove-degenerate-triangles vertices indices :threshold angle-threshold)))
   (values vertices indices))
