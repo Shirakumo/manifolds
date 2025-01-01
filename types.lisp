@@ -122,34 +122,32 @@
      (map-into (make-array (length a) :element-type 'double-float)
                #'f64 a))))
 
-(defmacro with-vertex-specialization ((var &optional (component-type-var 'vertex-component-type)) &body body)
+(defmacro with-specialization ((var typevar &rest expanded-types) &body body)
   `(etypecase ,var
-     ((vertex-array single-float)
-      (let ((,component-type-var 'single-float))
-        (declare (ignorable ,component-type-var))
-        ,@body))
-     ((vertex-array double-float)
-      (let ((,component-type-var 'double-float))
-        (declare (ignorable ,component-type-var))
-        ,@body))))
+     ,@(loop for type in expanded-types
+             collect `(,type
+                       ,(eval `(let ((,typevar ',type)) ,@body))))))
+
+(defmacro with-vertex-specialization ((var &optional (component-type-var 'vertex-component-type)) &body body)
+  `(with-specialization (,var type (vertex-array single-float) (vertex-array double-float))
+     `(let ((,',component-type-var ',(second type)))
+        (declare (ignorable ,',component-type-var))
+        ,@',body)))
 
 (defmacro with-face-specialization ((var &optional (component-type-var 'face-component-type)) &body body)
-  `(etypecase ,var
-     ((face-array (unsigned-byte 16))
-      (let ((,component-type-var '(unsigned-byte 16)))
-        (declare (ignorable ,component-type-var))
-        ,@body))
-     ((face-array (unsigned-byte 32))
-      (let ((,component-type-var '(unsigned-byte 32)))
-        (declare (ignorable ,component-type-var))
-        ,@body))))
+  `(with-specialization (,var type (face-array (unsigned-byte 16)) (face-array (unsigned-byte 32)))
+     `(let ((,',component-type-var ',(second type)))
+        (declare (ignorable ,',component-type-var))
+        ,@',body)))
 
 (declaim (inline simplify unsimplify))
 (defun simplify (array)
+  (declare (type array array))
   (make-array (length array) :element-type (array-element-type array)
                              :initial-contents array))
 
 (defun unsimplify (array)
+  (declare (type array array))
   (make-array (length array) :element-type (array-element-type array)
                              :initial-contents array
                              :adjustable T

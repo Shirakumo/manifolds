@@ -101,7 +101,8 @@
 
 (declaim (inline face-corner))
 (defun face-corner (face a b faces)
-  (check-type faces face-array)
+  (declare (optimize speed))
+  (declare (type face face a b))
   (let ((i0 (aref faces (+ (* 3 face) 0)))
         (i1 (aref faces (+ (* 3 face) 1)))
         (i2 (aref faces (+ (* 3 face) 2))))

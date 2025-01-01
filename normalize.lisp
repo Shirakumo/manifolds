@@ -61,84 +61,93 @@
             (values (simplify new-vertices) new-indices)))))))
 
 (defun remove-degenerate-triangles (vertices indices &key (threshold 0.01))
+  (declare (optimize speed (safety 1)))
   (check-type vertices vertex-array)
   (check-type indices face-array)
-  (with-vertex-specialization (vertices)
-    (with-face-specialization (indices)
-      (let ((new-vertices (unsimplify vertices))
-            (new-indices (unsimplify indices))
-            (adjacency (face-adjacency-list indices)))
-        (labels ((delete-triangle (face)
-                   ;; Setting the triangle vertices to the same will cause it
-                   ;; to be deleted later in DELETE-UNUSED.
-                   (setf (aref new-indices (+ (* face 3) 0)) 0)
-                   (setf (aref new-indices (+ (* face 3) 1)) 0)
-                   (setf (aref new-indices (+ (* face 3) 2)) 0))
-                 (make-triangle (a b c)
-                   (vector-push-extend a new-indices)
-                   (vector-push-extend b new-indices)
-                   (vector-push-extend c new-indices))
-                 (fuse-edge (a b face)
-                   (let ((mid (nv* (nv+ (v vertices a) (v vertices b)) 0.5)))
-                     ;; Set the vertices to the midpoint, and delete this triangle
-                     ;; and all adjacents over the edge.
-                     (setf (v new-vertices a) mid)
-                     (setf (v new-vertices b) mid)
-                     (mapc #'delete-triangle (adjacent-faces face a b indices adjacency))
-                     (delete-triangle face)))
-                 (split-edge (a b c face)
-                   ;; Split AB edge to M, create new triangles AMC, BMC, AMD, BMD
-                   ;; where D is the opposing corner of any triangle over AB, and
-                   ;; mark the original triangles for deletion
-                   (let ((mid (nv* (nv+ (v vertices a) (v vertices b)) 0.5))
-                         (m (truncate (length vertices) 3)))
-                     (vector-push-extend (vx mid) new-vertices)
-                     (vector-push-extend (vy mid) new-vertices)
-                     (vector-push-extend (vz mid) new-vertices)
-                     (let ((adjacents (adjacent-faces face a b indices adjacency)))
-                       (make-triangle c m a)
-                       (make-triangle c b m)
-                       (loop for face in adjacents
-                             for d = (face-corner face a b indices)
-                             do (make-triangle d m a)
-                                (make-triangle d b m))
-                       (delete-triangle face)
-                       (mapc #'delete-triangle adjacents))))
-                 (consider (corner a b face)
-                   (let ((cp (v vertices corner))
-                         (ap (v vertices a))
-                         (bp (v vertices b)))
-                     (when (< (vangle (v- ap cp) (v- bp cp)) threshold)
-                       (let ((a-d (vdistance cp ap))
-                             (b-d (vdistance cp bp))
-                             (ab-d (vdistance ap bp)))
-                         (cond ((and (< ab-d a-d) (< ab-d b-d))
-                                (fuse-edge a b face))
-                               ((< a-d b-d)
-                                (split-edge corner b a face))
-                               (T
-                                (split-edge corner a b face))))
-                       T))))
-          ;; In the first step, we loop and generate new vertices and new triangles
-          ;; until there aren't any changes made anymore.
-          (tagbody retry
-             (loop for i from 0 below (length indices) by 3
-                   for face from 0
-                   for p1 = (aref indices (+ i 0))
-                   for p2 = (aref indices (+ i 1))
-                   for p3 = (aref indices (+ i 2))
-                   do (when (and (/= p1 p2) (/= p1 p3) (/= p2 p3)
-                                 (or (consider p1 p2 p3 face)
-                                     (consider p2 p1 p3 face)
-                                     (consider p3 p1 p2 face)))
-                        ;; We have a change made. We have to retry **now**
-                        ;; as continuing would potentially confuse the algorithm
-                        ;; with outdated information.
-                        (setf vertices (simplify new-vertices))
-                        (setf indices (simplify new-indices))
-                        (setf adjacency (face-adjacency-list indices))
-                        (go retry))))
-          (remove-unused vertices indices))))))
+  (with-specialization (vertices vtype (vertex-array single-float) (vertex-array double-float))
+    `(with-specialization (indices ftype (face-array (unsigned-byte 16)) (face-array (unsigned-byte 32)))
+       `(let ((new-vertices (unsimplify vertices))
+              (new-indices (unsimplify indices))
+              (adjacency (face-adjacency-list indices))
+              (threshold (coerce threshold ',',(second vtype))))
+          (declare (type (and (array ,(second ftype) (*)) (not simple-array)) new-indices)
+                   (type (simple-array ,(second ftype) (*)) indices))
+          (declare (type (and (array ,',(second vtype) (*)) (not simple-array)) new-vertices)
+                   (type (simple-array ,',(second vtype) (*)) vertices))
+          (labels ((delete-triangle (face)
+                     (declare (type face face))
+                     ;; Setting the triangle vertices to the same will cause it
+                     ;; to be deleted later in DELETE-UNUSED.
+                     (setf (aref new-indices (+ (* face 3) 0)) 0)
+                     (setf (aref new-indices (+ (* face 3) 1)) 0)
+                     (setf (aref new-indices (+ (* face 3) 2)) 0))
+                   (make-triangle (a b c)
+                     (vector-push-extend a new-indices)
+                     (vector-push-extend b new-indices)
+                     (vector-push-extend c new-indices))
+                   (fuse-edge (a b face)
+                     (declare (type face face))
+                     (let ((mid (nv* (nv+ (v vertices a) (v vertices b)) 0.5)))
+                       ;; Set the vertices to the midpoint, and delete this triangle
+                       ;; and all adjacents over the edge.
+                       (setf (v new-vertices a) mid)
+                       (setf (v new-vertices b) mid)
+                       (mapc #'delete-triangle (adjacent-faces face a b indices adjacency))
+                       (delete-triangle face)))
+                   (split-edge (a b c face)
+                     (declare (type face face))
+                     ;; Split AB edge to M, create new triangles AMC, BMC, AMD, BMD
+                     ;; where D is the opposing corner of any triangle over AB, and
+                     ;; mark the original triangles for deletion
+                     (let ((mid (nv* (nv+ (v vertices a) (v vertices b)) 0.5))
+                           (m (truncate (length vertices) 3)))
+                       (vector-push-extend (vx mid) new-vertices)
+                       (vector-push-extend (vy mid) new-vertices)
+                       (vector-push-extend (vz mid) new-vertices)
+                       (let ((adjacents (adjacent-faces face a b indices adjacency)))
+                         (make-triangle c m a)
+                         (make-triangle c b m)
+                         (loop for face in adjacents
+                               for d = (face-corner face a b indices)
+                               do (make-triangle d m a)
+                                  (make-triangle d b m))
+                         (delete-triangle face)
+                         (mapc #'delete-triangle adjacents))))
+                   (consider (corner a b face)
+                     (let ((cp (v vertices corner))
+                           (ap (v vertices a))
+                           (bp (v vertices b)))
+                       (when (< (vangle (v- ap cp) (v- bp cp)) threshold)
+                         (let ((a-d (vdistance cp ap))
+                               (b-d (vdistance cp bp))
+                               (ab-d (vdistance ap bp)))
+                           (cond ((and (< ab-d a-d) (< ab-d b-d))
+                                  (fuse-edge a b face))
+                                 ((< a-d b-d)
+                                  (split-edge corner b a face))
+                                 (T
+                                  (split-edge corner a b face))))
+                         T))))
+            ;; In the first step, we loop and generate new vertices and new triangles
+            ;; until there aren't any changes made anymore.
+            (tagbody retry
+               (loop for i of-type face from 0 below (length indices) by 3
+                     for face of-type face from 0
+                     for p1 = (aref indices (+ i 0))
+                     for p2 = (aref indices (+ i 1))
+                     for p3 = (aref indices (+ i 2))
+                     do (when (and (/= p1 p2) (/= p1 p3) (/= p2 p3)
+                                   (or (consider p1 p2 p3 face)
+                                       (consider p2 p1 p3 face)
+                                       (consider p3 p1 p2 face)))
+                          ;; We have a change made. We have to retry **now**
+                          ;; as continuing would potentially confuse the algorithm
+                          ;; with outdated information.
+                          (setf vertices (simplify new-vertices))
+                          (setf indices (simplify new-indices))
+                          (setf adjacency (face-adjacency-list indices))
+                          (go retry))))
+            (remove-unused vertices indices))))))
 
 (defun remove-duplicate-vertices (vertices indices &key (threshold 0.001) (center (vec3 0)) (scale 1.0))
   (check-type vertices vertex-array)
