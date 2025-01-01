@@ -185,7 +185,8 @@
               ;; In the first step, we loop and generate new vertices and new triangles
               ;; until there aren't any changes made anymore.
               (tagbody retry
-                 (loop for i of-type face from 0 below (length indices) by 3
+                 (loop with found = NIL
+                       for i of-type face from 0 below (length indices) by 3
                        for face of-type face from 0
                        for p1 = (aref indices (+ i 0))
                        for p2 = (aref indices (+ i 1))
@@ -194,10 +195,8 @@
                                      (or (consider p1 p2 p3 face)
                                          (consider p2 p1 p3 face)
                                          (consider p3 p1 p2 face)))
-                            ;; We have a change made. We have to retry **now**
-                            ;; as continuing would potentially confuse the algorithm
-                            ;; with outdated information.
-                            (go retry))))
+                            (setf found T))
+                       finally (when found (go retry))))
               (remove-unused (simplify vertices) (simplify indices))))))))
 
 (defun remove-duplicate-vertices (vertices indices &key (threshold 0.001) (center (vec3 0)) (scale 1.0))
