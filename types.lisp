@@ -30,6 +30,9 @@
 (deftype face ()
   `(integer 0 ,(truncate (1- (ash 1 32)) 3)))
 
+(deftype unsimple-array (&optional (eltype T))
+  `(and (array ,eltype (*)) (not simple-array)))
+
 (declaim (inline edge extended-edge))
 
 (defstruct (edge
