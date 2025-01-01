@@ -305,6 +305,16 @@
           (declare (dynamic-extent p3-p1))
           (* 0.5 base (v2norm (nv- p3-p1 (nv* p2-p1 (/ (v. p3-p1 p2-p1) (* base base))))))))))
 
+(declaim (inline face-edge-p))
+(defun face-edge-p (faces face a b)
+  (declare (type face face a b))
+  (let* ((i (* 3 face))
+         (i0 (aref faces (+ i 0)))
+         (i1 (aref faces (+ i 1)))
+         (i2 (aref faces (+ i 2))))
+    (and (or (= a i0) (= a i1) (= a i2))
+         (or (= b i0) (= b i1) (= b i2)))))
+
 (defun face-area (vertices faces face)
   (check-type vertices vertex-array)
   (check-type faces face-array)

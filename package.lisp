@@ -36,6 +36,7 @@
    #:face-normal
    #:face-normals
    #:triangle-area
+   #:face-edge-p
    #:face-area
    #:surface-area
    #:boundary-length

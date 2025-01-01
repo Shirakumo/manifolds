@@ -259,6 +259,13 @@ VERTICES must be a VERTEX-ARRAY.
 
 See VERTEX-ARRAY (type)
 See FACE-ARRAY (type)")
+
+  (function face-edge-p
+    "Returns true if the edge given by A B is a part of FACE
+
+FACES must be a FACE-ARRAY.
+
+See FACE-ARRAY (type)")
   
   (function face-area
     "Returns the area covered by the face.
