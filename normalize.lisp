@@ -264,6 +264,6 @@
           (and area-threshold (< 0 area-threshold)))
       (multiple-value-setq (vertices indices) (remove-degenerate-triangles vertices indices
                                                                            :angle-threshold angle-threshold
-                                                                           :area-threshold area-threshold))
+                                                                           :area-threshold (* scale area-threshold)))
       (multiple-value-setq (vertices indices) (remove-unused vertices indices)))
   (values vertices indices))

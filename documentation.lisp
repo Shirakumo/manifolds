@@ -509,7 +509,8 @@ This is a shorthand for invoking
 REMOVE-DUPLICATE-VERTICES (if THRESHOLD is non-NIL and greater than
 zero) and
 REMOVE-DEGENERATE-TRIANGLES (if ANGLE-THRESHOLD or AREA-THRESHOLD are
-non-NIL and greater than zero) or REMOVE-UNUSED (if not)
+non-NIL and greater than zero) or REMOVE-UNUSED (if not). The
+AREA-THRESHOLD is multiplied by SCALE.
 
 Returns two values, a fresh VERTICES array and fresh FACES array.
 
