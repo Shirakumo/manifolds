@@ -275,14 +275,14 @@
          (a (v vertices (aref faces (+ 0 i))))
          (b (v vertices (aref faces (+ 1 i))))
          (c (v vertices (aref faces (+ 2 i)))))
-    (vc (v- b a) (v- c a))))
+    (nvc (nv- b a) (nv- c a))))
 
 (defun face-normal* (vertices faces face)
   (let* ((i (* 3 face))
          (a (aref vertices (aref faces (+ 0 i))))
          (b (aref vertices (aref faces (+ 1 i))))
          (c (aref vertices (aref faces (+ 2 i)))))
-    (vc (v- b a) (v- c a))))
+    (nvc (v- b a) (v- c a))))
 
 (defun face-normals (vertices faces &optional (face-normals (make-array (truncate (length faces) 3))))
   (check-type vertices vertex-array)
@@ -571,6 +571,20 @@
            (loop initially (unless adjacency (setf adjacency (vertex-adjacency-list faces)))
                  for vertex from 0 below (length adjacency)
                  always (edge-loop-p adjacency vertex))))))
+
+(defun convex-p (vertices faces &optional (eps 0.0000001))
+  (check-type faces face-array)
+  (with-vertex-specialization (vertices)
+    (loop for face from 0 below (truncate (length faces) 3)
+          for normal = (face-normal vertices faces face)
+          for offset = (- (v. normal (v vertices (aref faces (* 3 face)))))
+          ;; Check if all points lie below the plane
+          always (loop for vertex from 0 below (length vertices) by 3
+                       always (< (+ offset
+                                    (* (vx normal) (aref vertices (+ vertex 0)))
+                                    (* (vy normal) (aref vertices (+ vertex 1)))
+                                    (* (vz normal) (aref vertices (+ vertex 2))))
+                                 eps)))))
 
 (defun separate-meshes (vertices faces)
   (check-type vertices vertex-array)

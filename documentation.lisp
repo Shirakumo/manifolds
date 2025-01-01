@@ -394,6 +394,15 @@ See FACE-ARRAY (type)")
 FACES must be a FACE-ARRAY.
 
 See FACE-ARRAY (type)")
+
+  (function convex-p
+    "Returns true if the mesh is convex.
+
+FACES must be a FACE-ARRAY
+VERTICES must be a VERTEX-ARRAY
+
+See FACE-ARRAY (type)
+See VERTEX-ARRAY (type")
   
   (function separate-meshes
     "Returns a list of disjoint meshes.

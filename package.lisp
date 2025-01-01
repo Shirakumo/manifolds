@@ -50,6 +50,7 @@
    #:bounding-box
    #:vertex-faces
    #:2-manifold-p
+   #:convex-p
    #:separate-meshes
    #:normalize
    #:transform-mesh
