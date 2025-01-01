@@ -39,27 +39,31 @@
       (pushnew b (aref adjacency c)))))
 
 (defun face-adjacency-list (faces &optional adjacency)
+  (declare (optimize speed (safety 1)))
   (check-type faces face-array)
-  (let ((table (make-hash-table :test 'eql))
-        (adjacency (or adjacency
-                       (make-array (truncate (length faces) 3) :initial-element ())))
-        (face 0))
-    (flet ((edge (a b face)
-             (when (< b a)
-               (rotatef a b))
-             (let ((edge (+ (ash a 32) b)))
-               (push face (gethash edge table)))))
-      (do-faces (a b c faces)
-        (edge a b face)
-        (edge b c face)
-        (edge c a face)
-        (incf face)))
-    (loop for adjacents being the hash-values of table
-          do (loop for face in adjacents
-                   do (loop for other in adjacents
-                            unless (= other face)
-                            do (push other (aref adjacency face)))))
-    adjacency))
+  (with-face-specialization (faces)
+    (let ((table (make-hash-table :test 'eql))
+          (adjacency (or adjacency (make-array (truncate (length faces) 3) :initial-element ())))
+          (face 0))
+      (declare (type face face))
+      (declare (type simple-vector adjacency))
+      (flet ((edge (a b face)
+               (declare (type (unsigned-byte 30) a b face))
+               (when (< b a)
+                 (rotatef a b))
+               (let ((edge (+ (ash a 32) b)))
+                 (push face (gethash edge table)))))
+        (do-faces (a b c faces)
+          (edge a b face)
+          (edge b c face)
+          (edge c a face)
+          (incf face)))
+      (loop for adjacents being the hash-values of table
+            do (loop for face of-type face in adjacents
+                     do (loop for other of-type face in adjacents
+                              unless (= other face)
+                              do (push other (aref adjacency face)))))
+      adjacency)))
 
 (defun half-edge-list (faces)
   (check-type faces face-array)
