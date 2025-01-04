@@ -256,10 +256,11 @@
         (values (simplify new-vertices) (simplify new-indices))))))
 
 (defun normalize (vertices indices &key (threshold 0.001) (center (vec 0 0 0)) (scale 1.0) (angle-threshold 0.001) (area-threshold 0.001))
-  (multiple-value-setq (vertices indices) (remove-duplicate-vertices vertices indices
-                                                                     :threshold threshold
-                                                                     :center center
-                                                                     :scale scale))
+  (when (and threshold (< 0 threshold))
+    (multiple-value-setq (vertices indices) (remove-duplicate-vertices vertices indices
+                                                                       :threshold threshold
+                                                                       :center center
+                                                                       :scale scale)))
   (if (or (and angle-threshold (< 0 angle-threshold))
           (and area-threshold (< 0 area-threshold)))
       (multiple-value-setq (vertices indices) (remove-degenerate-triangles vertices indices
