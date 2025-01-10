@@ -52,6 +52,9 @@
    #:2-manifold-p
    #:convex-p
    #:separate-meshes
+   #:remove-unused
+   #:remove-degenerate-triangles
+   #:remove-duplicate-vertices
    #:normalize
    #:transform-mesh
    #:voxelize
