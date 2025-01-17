@@ -267,15 +267,25 @@
                    (nv+ normal (normal a (first adjacents)))))
       (nv* normal (/ count)))))
 
-(defun face-normal (vertices faces face)
+(defun face-normal (vertices faces face &optional (output (vec3)))
   (check-type vertices vertex-array)
   (check-type faces face-array)
   (check-type face face)
-  (let* ((i (* 3 face))
-         (a (v vertices (aref faces (+ 0 i))))
-         (b (v vertices (aref faces (+ 1 i))))
-         (c (v vertices (aref faces (+ 2 i)))))
-    (nvunit (nvc (nv- b a) (nv- c a)))))
+  (macrolet ((frob ()
+               `(progn
+                  (v vertices (aref faces (+ 0 i)) a)
+                  (v vertices (aref faces (+ 1 i)) b)
+                  (v vertices (aref faces (+ 2 i)) c)
+                  (nvunit (!vc output (nv- b a) (nv- c a))))))
+    (etypecase output
+      (vec3
+       (let* ((i (* 3 face)) (a (vec3)) (b (vec3)) (c (vec3)))
+         (declare (dynamic-extent a b c))
+         (frob)))
+      (dvec3
+       (let* ((i (* 3 face)) (a (dvec3)) (b (dvec3)) (c (dvec3)))
+         (declare (dynamic-extent a b c))
+         (frob))))))
 
 (defun face-normal* (vertices faces face)
   (let* ((i (* 3 face))
