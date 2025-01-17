@@ -275,14 +275,14 @@
          (a (v vertices (aref faces (+ 0 i))))
          (b (v vertices (aref faces (+ 1 i))))
          (c (v vertices (aref faces (+ 2 i)))))
-    (nvc (nv- b a) (nv- c a))))
+    (nvunit (nvc (nv- b a) (nv- c a)))))
 
 (defun face-normal* (vertices faces face)
   (let* ((i (* 3 face))
          (a (aref vertices (aref faces (+ 0 i))))
          (b (aref vertices (aref faces (+ 1 i))))
          (c (aref vertices (aref faces (+ 2 i)))))
-    (nvc (v- b a) (v- c a))))
+    (nvunit (nvc (v- b a) (v- c a)))))
 
 (defun face-normals (vertices faces &optional (face-normals (make-array (truncate (length faces) 3))))
   (check-type vertices vertex-array)
