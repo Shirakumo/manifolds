@@ -267,7 +267,7 @@
                    (nv+ normal (normal a (first adjacents)))))
       (nv* normal (/ count)))))
 
-(defun face-normal (vertices faces face &optional (output (vec3)))
+(defun face-normal (vertices faces face &optional output)
   (check-type vertices vertex-array)
   (check-type faces face-array)
   (check-type face face)
@@ -277,6 +277,10 @@
                   (v vertices (aref faces (+ 1 i)) b)
                   (v vertices (aref faces (+ 2 i)) c)
                   (nvunit (!vc output (nv- b a) (nv- c a))))))
+    (unless output
+      (setf output (ecase (array-element-type vertices)
+                     (single-float (vec3))
+                     (double-float (dvec3)))))
     (etypecase output
       (vec3
        (let* ((i (* 3 face)) (a (vec3)) (b (vec3)) (c (vec3)))
