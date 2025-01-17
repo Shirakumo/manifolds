@@ -582,19 +582,21 @@
                  for vertex from 0 below (length adjacency)
                  always (edge-loop-p adjacency vertex))))))
 
-(defun convex-p (vertices faces &optional (eps 0.0000001))
+(defun convex-p (vertices faces &optional (eps 0.00001d0))
   (check-type faces face-array)
   (with-vertex-specialization (vertices)
-    (loop for face from 0 below (truncate (length faces) 3)
-          for normal = (face-normal vertices faces face)
-          for offset = (- (v. normal (v vertices (aref faces (* 3 face)))))
-          ;; Check if all points lie below the plane
-          always (loop for vertex from 0 below (length vertices) by 3
-                       always (< (+ offset
-                                    (* (vx normal) (aref vertices (+ vertex 0)))
-                                    (* (vy normal) (aref vertices (+ vertex 1)))
-                                    (* (vz normal) (aref vertices (+ vertex 2))))
-                                 eps)))))
+    (let ((tmp (dvec3)) (normal (dvec3)))
+      (declare (dynamic-extent tmp normal))
+      (loop for face from 0 below (truncate (length faces) 3)
+            for offset = (- (v. (face-normal vertices faces face normal)
+                                (v vertices (aref faces (* 3 face)) tmp)))
+            ;; Check if all points lie below the plane
+            always (loop for vertex from 0 below (length vertices) by 3
+                         always (< (+ offset
+                                      (* (vx normal) (aref vertices (+ vertex 0)))
+                                      (* (vy normal) (aref vertices (+ vertex 1)))
+                                      (* (vz normal) (aref vertices (+ vertex 2))))
+                                   eps))))))
 
 (defun separate-meshes (vertices faces)
   (check-type vertices vertex-array)
