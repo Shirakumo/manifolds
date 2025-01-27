@@ -724,6 +724,9 @@
         (nv+* vec ba f)
         (nv+* vec ca g)))))
 
+(defun point-in-volume-p (vec vertices faces)
+  (error "IMPLEMENT ME!"))
+
 (defun random-point-in-volume (vertices faces &optional (vec (vec3)))
   (declare (type vec3 vec))
   (declare (optimize speed))
