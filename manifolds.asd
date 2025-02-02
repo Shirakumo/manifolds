@@ -11,7 +11,7 @@
   :components ((:file "package")
                (:file "types")
                (:file "manifolds")
-               (:file "convert")
+               #++(:file "convert")
                (:file "miniball")
                (:file "normalize")
                (:file "documentation"))
