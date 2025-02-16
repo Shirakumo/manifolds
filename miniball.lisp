@@ -269,7 +269,10 @@
                       (cond (stopper
                              (nv+* center center-to-aff scale)
                              (update-radius)
-                             (subspan-add subspan stopper))
+                             (if (< (subspan-rank subspan) 3)
+                                 (subspan-add subspan stopper)
+                                 ;; This should not happen but does anyway. Just bail.
+                                 (return)))
                             (T
                              (nv+ center center-to-aff)
                              (update-radius)
