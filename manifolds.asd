@@ -9,6 +9,7 @@
   :source-control (:git "https://github.com/shirakumo/manifolds.git")
   :serial T
   :components ((:file "package")
+               (:file "toolkit")
                (:file "types")
                (:file "manifolds")
                #++(:file "convert")
