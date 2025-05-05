@@ -24,6 +24,7 @@
    #:f64*)
   (:export
    #:do-faces
+   #:do-vertices
    #:vertex-adjacency-list
    #:face-adjacency-list
    #:half-edge-list

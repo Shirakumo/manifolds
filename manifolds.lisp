@@ -11,6 +11,39 @@
            do (progn ,@body)
            finally (return ,result))))
 
+(defmacro do-vertices ((v vertices &key (update T) result) &body body)
+  (let ((verts (gensym "V"))
+        (varr (gensym "VARR")))
+    `(let ((,verts ,vertices))
+       (etypecase ,verts
+         ((vertex-array single-float)
+          (let* ((,v (vec3))
+                 (,varr (varr3 ,v)))
+            (declare (dynamic-extent ,v))
+            (loop for i from 0 below (length ,verts) by 3
+                  do (setf (aref ,varr 0) (aref ,verts (+ i 0))
+                           (aref ,varr 1) (aref ,verts (+ i 1))
+                           (aref ,varr 2) (aref ,verts (+ i 2)))
+                     (progn ,@body)
+                     ,@(when update
+                         `((setf (aref ,verts (+ i 0)) (aref ,varr 0)
+                                 (aref ,verts (+ i 1)) (aref ,varr 1)
+                                 (aref ,verts (+ i 2)) (aref ,varr 2)))))))
+         ((vertex-array double-float)
+          (let* ((,v (dvec3))
+                 (,varr (dvarr3 ,v)))
+            (declare (dynamic-extent ,v))
+            (loop for i from 0 below (length ,verts) by 3
+                  do (setf (aref ,varr 0) (aref ,verts (+ i 0))
+                           (aref ,varr 1) (aref ,verts (+ i 1))
+                           (aref ,varr 2) (aref ,verts (+ i 2)))
+                     (progn ,@body)
+                     ,@(when update
+                         `((setf (aref ,verts (+ i 0)) (aref ,varr 0)
+                                 (aref ,verts (+ i 1)) (aref ,varr 1)
+                                 (aref ,verts (+ i 2)) (aref ,varr 2))))))))
+       ,result)))
+
 (defmacro do-directions ((x y z &optional (min 0) (max 1) result) &body body)
   (let ((thunk (gensym "THUNK")))
     `(block NIL
