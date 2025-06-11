@@ -60,7 +60,8 @@
                        (incf fi 3)))
             (values (simplify new-vertices) new-indices)))))))
 
-(defun remove-degenerate-triangles (vertices indices &key (angle-threshold 0.01) (area-threshold 0.001))
+(defun remove-degenerate-triangles (vertices indices &key (angle-threshold 0.01) (area-threshold 0.001)
+                                                          (length-threshold 0.01))
   (declare (optimize speed (safety 1)))
   (check-type vertices vertex-array)
   (check-type indices face-array)
@@ -139,7 +140,7 @@
                        ;;
                        ;; This is messy because we update the adjacency map and vertex
                        ;; face map in-place to avoid recomputing them on each iteration
-                       (let ((mid (nv* (nv+ (v vertices a) (v vertices b)) 0.5))
+                       (let ((mid (v vertices c) #++(nv* (nv+ (v vertices a) (v vertices b)) 0.5))
                              (m (truncate (length vertices) 3)))
                          (vector-push-extend (vx mid) vertices)
                          (vector-push-extend (vy mid) vertices)
@@ -189,10 +190,11 @@
                            (let ((a-d (vdistance cp ap))
                                  (b-d (vdistance cp bp))
                                  (ab-d (vdistance ap bp)))
-                             ;; If the opposing edge is the smallest, fuse it, otherwise
-                             ;; split the longer edge as it is more likely to not lead to
-                             ;; further degenerate triangles.
-                             (cond ((and (< ab-d a-d) (< ab-d b-d))
+                             ;; If the opposing edge is the smallest, and it isn't large
+                             ;; by itself either, fuse it, otherwise split the longer edge
+                             ;; as it is more likely to not lead to further degenerate triangles.
+                             (cond ((and (< ab-d a-d) (< ab-d b-d)
+                                         (< ab-d length-threshold))
                                     (fuse-edge a b face))
                                    ((< a-d b-d)
                                     (split-edge corner b a face))

@@ -480,7 +480,9 @@ angle should be for a face to be considered to have no relevant
 surface and be removed. Similarly, AREA-THRESHOLD is a parameter to
 determine the surface area below which a triangle is deleted. This
 will potentially move vertices and introduce new vertices, and remove
-or introduce new faces.
+or introduce new faces. Finally, LENGTH-THRESHOLD is used to determine
+whether an edge is small enough to consider for fusion. If an edge is
+above this length it will be split instead of fused away.
 
 This will also compact the mesh via REMOVE-UNUSED.
 
