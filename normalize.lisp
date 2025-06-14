@@ -97,6 +97,20 @@
                          (setf (aref adjacency adjacent) (delete face (the list (aref adjacency adjacent)))))
                        (setf (aref adjacency face) ()))
                      (make-triangle (a b c adjacent)
+                       ;; Check if the winding order of an adjacent face
+                       ;; is the same as the first two vertices (which form
+                       ;; the edge of the adjacent. If so, we need to flip
+                       ;; the winding order of this new triangle to match the
+                       ;; face normal.
+                       (when adjacent
+                         (let* ((f (* 3 (first adjacent)))
+                                (f0 (aref indices (+ f 0)))
+                                (f1 (aref indices (+ f 1)))
+                                (f2 (aref indices (+ f 2))))
+                           (when (or (and (= f0 a) (= f1 b))
+                                     (and (= f1 a) (= f2 b))
+                                     (and (= f2 a) (= f0 b)))
+                             (rotatef a b))))
                        ;; Create a new triangle while maintaining the maps
                        (let ((tri (truncate (length indices) 3)))
                          (vector-push-extend a indices)
