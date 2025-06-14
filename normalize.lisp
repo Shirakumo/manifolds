@@ -147,36 +147,28 @@
                          (delete-triangle face)))
                      (split-edge (a b c face)
                        (declare (type face face))
-                       ;; Split AB edge to M, create new triangles AMD, BMD
+                       ;; Split AB edge to C, create new triangles ACD, BCD
                        ;; where D is the opposing corner of any triangle over AB,
-                       ;; mark the original triangles for deletion, and update any
-                       ;; triangles that used to refer to C to M.
+                       ;; mark the original triangles for deletion.
                        ;;
                        ;; This is messy because we update the adjacency map and vertex
                        ;; face map in-place to avoid recomputing them on each iteration
-                       (let ((mid (v vertices c) #++(nv* (nv+ (v vertices a) (v vertices b)) 0.5))
-                             (m (truncate (length vertices) 3)))
-                         (vector-push-extend (vx mid) vertices)
-                         (vector-push-extend (vy mid) vertices)
-                         (vector-push-extend (vz mid) vertices)
-                         (vector-push-extend (make-array 0 :adjustable T :fill-pointer T) vfaces)
-                         (let* ((adjacents (adjacent-faces face a b indices adjacency))
-                                (cornering (vfaces c)))
-                           (loop for face across cornering
-                                 do (update-triangle face c m))
-                           (loop for face in adjacents
-                                 for d = (face-corner face a b indices)
-                                 for al = (make-triangle d m a (adjacent-faces face d a indices adjacency))
-                                 for ar = (make-triangle d b m (adjacent-faces face d b indices adjacency))
-                                 do (push al (aref adjacency ar))
-                                    (push ar (aref adjacency al))
-                                    (loop for face across cornering
-                                          do (cond ((face-edge-p indices face a m)
-                                                    (push al (aref adjacency face)))
-                                                   ((face-edge-p indices face b m)
-                                                    (push ar (aref adjacency face))))))
-                           (delete-triangle face)
-                           (mapc #'delete-triangle adjacents))))
+                       (vector-push-extend (make-array 0 :adjustable T :fill-pointer T) vfaces)
+                       (let* ((adjacents (adjacent-faces face a b indices adjacency))
+                              (cornering (vfaces c)))
+                         (loop for face in adjacents
+                               for d = (face-corner face a b indices)
+                               for al = (make-triangle d a c (adjacent-faces face d a indices adjacency))
+                               for ar = (make-triangle d b c (adjacent-faces face d b indices adjacency))
+                               do (push al (aref adjacency ar))
+                                  (push ar (aref adjacency al))
+                                  (loop for face across cornering
+                                        do (cond ((face-edge-p indices face a c)
+                                                  (push al (aref adjacency face)))
+                                                 ((face-edge-p indices face b c)
+                                                  (push ar (aref adjacency face))))))
+                         (delete-triangle face)
+                         (mapc #'delete-triangle adjacents)))
                      (consider-area (a b c face)
                        (let ((ap (v vertices a))
                              (bp (v vertices b))
