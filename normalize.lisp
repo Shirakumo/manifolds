@@ -178,12 +178,20 @@
                                  (b-d (vdistance bp cp))
                                  (c-d (vdistance cp ap)))
                              ;; Find smallest edge and fuse it
-                             (cond ((and (< a-d b-d) (< a-d c-d))
+                             (cond ((and (< a-d b-d) (< a-d c-d) (< a-d length-threshold))
                                     (fuse-edge a b face))
-                                   ((and (< b-d a-d) (< b-d c-d))
+                                   ((and (< b-d a-d) (< b-d c-d) (< b-d length-threshold))
                                     (fuse-edge b c face))
+                                   ((< c-d length-threshold)
+                                    (fuse-edge c a face))
+                                   ;; No edge was small enough to be fused away safely.
+                                   ;; We instead will try to dissolve the longest edge.
+                                   ((and (< b-d a-d) (< c-d a-d))
+                                    (split-edge a b c face))
+                                   ((and (< a-d b-d) (< c-d b-d))
+                                    (split-edge b c a face))
                                    (T
-                                    (fuse-edge c a face)))))))
+                                    (split-edge c a b face)))))))
                      (consider-angle (corner a b face)
                        ;; Consider one corner of the triangle for merging
                        (let* ((cp (v vertices corner))
