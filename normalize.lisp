@@ -266,7 +266,7 @@
   (if (or (and angle-threshold (< 0 angle-threshold))
           (and area-threshold (< 0 area-threshold)))
       (multiple-value-setq (vertices indices) (remove-degenerate-triangles vertices indices
-                                                                           :angle-threshold angle-threshold
-                                                                           :area-threshold (* scale area-threshold)))
+                                                                           :angle-threshold (or angle-threshold 0.0)
+                                                                           :area-threshold (* scale (or area-threshold 0.0))))
       (multiple-value-setq (vertices indices) (remove-unused vertices indices)))
   (values vertices indices))
