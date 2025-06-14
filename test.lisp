@@ -26,9 +26,8 @@
   (let* ((filename (test-file (if (stringp name) (make-pathname :name name :type "obj") name)))
          (context (wavefront:parse filename))
          (meshes (wavefront:extract-meshes context NIL '(:position))))
-    (assert (= (length meshes) 1))
-    (assert (= (wavefront:face-length (first meshes)) 3))
-    (first meshes)))
+    (assert (loop for mesh in meshes always (= (wavefront:face-length mesh) 3)))
+    meshes))
 
 (defun save-mesh (file vertices faces)
   (wavefront:serialize (make-instance 'wavefront:mesh
@@ -36,6 +35,18 @@
                                       :vertex-data vertices
                                       :index-data faces
                                       :attributes '(:position))
+                       file :if-exists :supersede)
+  file)
+
+(defun save-meshes (file vertices faces)
+  (wavefront:serialize (loop for v in vertices
+                             for f in faces
+                             for i from 1
+                             collect (make-instance 'wavefront:mesh
+                                                    :name (format NIL "Mesh~d" i)
+                                                    :vertex-data v
+                                                    :index-data f
+                                                    :attributes '(:position)))
                        file :if-exists :supersede)
   file)
 
@@ -58,7 +69,7 @@
     dst))
 
 (define-test edge-list.smoke
-  (let* ((mesh (load-mesh "box"))
+  (let* ((mesh (first (load-mesh "box")))
          (edge-list (edge-list (wavefront:index-data mesh))))
     (is eql 18 (length edge-list))))
 
@@ -75,18 +86,18 @@
     (test 'double-float)))
 
 (define-test boundary-list.smoke
-  (let* ((mesh (load-mesh "box"))
+  (let* ((mesh (first (load-mesh "box")))
          (boundary-list (boundary-list (wavefront:index-data mesh))))
     (is eql 0 (length boundary-list)))
 
-  (let* ((mesh (load-mesh "boundary-1"))
+  (let* ((mesh (first (load-mesh "boundary-1")))
          (boundary-list (boundary-list (wavefront:index-data mesh))))
     (is eql 3 (length boundary-list))
     (map nil (lambda (element)
                (of-type 'extended-edge element))
          (boundary-list (wavefront:index-data mesh))))
 
-  (let* ((mesh (load-mesh "boundary-2"))
+  (let* ((mesh (first (load-mesh "boundary-2")))
          (boundary-list (boundary-list (wavefront:index-data mesh))))
     (is eql 8 (length boundary-list))
     (map nil (lambda (element)
@@ -94,9 +105,11 @@
          (boundary-list (wavefront:index-data mesh)))))
 
 (defun normalize-file (in out &rest args)
-  (let ((mesh (load-mesh in)))
-    (multiple-value-bind (v f) (apply #'normalize (wavefront:vertex-data mesh) (wavefront:index-data mesh) args)
-      (save-mesh (test-file (if (stringp out) (make-pathname :name out :type "obj") out)) v f))))
+  (let (vs fs)
+    (dolist (mesh (load-mesh in))
+      (multiple-value-bind (v f) (apply #'normalize (wavefront:vertex-data mesh) (wavefront:index-data mesh) args)
+        (push v vs) (push f fs)))
+    (save-meshes (test-file (if (stringp out) (make-pathname :name out :type "obj") out)) vs fs)))
 
 (define-test normalize.smoke
   (flet ((test (vertex-component-type)
@@ -113,7 +126,7 @@
     (test 'double-float))
 
   (dolist (file (directory (test-file "degenerate-*.obj")))
-    (let* ((mesh (load-mesh (pathname-name file))))
+    (let* ((mesh (first (load-mesh (pathname-name file)))))
       (finish (normalize (wavefront:vertex-data mesh) (wavefront:index-data mesh))))))
 
 (define-test bounding-sphere
