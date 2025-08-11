@@ -4,9 +4,9 @@
   :author "Yukari Hafner <shinmera@tymoon.eu>"
   :maintainer "Yukari Hafner <shinmera@tymoon.eu>"
   :description "Various manifold mesh algorithms"
-  :homepage "https://shirakumo.github.io/manifolds/"
-  :bug-tracker "https://github.com/shirakumo/manifolds/issues"
-  :source-control (:git "https://github.com/shirakumo/manifolds.git")
+  :homepage "https://shirakumo.org/docs/manifolds/"
+  :bug-tracker "https://shirakumo.org/project/manifolds/issues"
+  :source-control (:git "https://shirakumo.org/project/manifolds.git")
   :serial T
   :components ((:file "package")
                (:file "toolkit")
@@ -27,9 +27,9 @@
   :author "Yukari Hafner <shinmera@tymoon.eu>"
   :maintainer "Yukari Hafner <shinmera@tymoon.eu>"
   :description "Tests for the manifolds system."
-  :homepage "https://shirakumo.github.io/manifolds/"
-  :bug-tracker "https://github.com/shirakumo/manifolds/issues"
-  :source-control (:git "https://github.com/shirakumo/manifolds.git")
+  :homepage "https://shirakumo.org/docs/manifolds/"
+  :bug-tracker "https://shirakumo.org/project/manifolds/issues"
+  :source-control (:git "https://shirakumo.org/project/manifolds.git")
   :serial T
   :components ((:file "test"))
   :depends-on (:manifolds :cl-wavefront :parachute)
